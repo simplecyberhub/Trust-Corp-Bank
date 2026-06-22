@@ -45,10 +45,31 @@ router.put("/users/me", async (req, res): Promise<void> => {
   if (!parse.success) { res.status(400).json({ error: parse.error.message }); return; }
 
   try {
-    const [user] = await db.update(usersTable)
-      .set({ ...parse.data, updatedAt: new Date() })
-      .where(eq(usersTable.clerkId, userId))
-      .returning();
+    // Try to update first; if not found, upsert (handles race condition on first login sync)
+    const existing = await db.select().from(usersTable).where(eq(usersTable.clerkId, userId)).limit(1);
+    
+    let user;
+    if (existing.length === 0) {
+      // First-time: create the user with info from the PUT body
+      const email = (parse.data as any).email ?? "";
+      const fullName = (parse.data as any).fullName ?? "User";
+      [user] = await db.insert(usersTable)
+        .values({ clerkId: userId, email, fullName, ...parse.data })
+        .returning();
+    } else {
+      // Strip undefined values to avoid overwriting with null
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
+      for (const [k, v] of Object.entries(parse.data)) {
+        if (v !== undefined && v !== null && v !== "") {
+          updates[k] = v;
+        }
+      }
+      [user] = await db.update(usersTable)
+        .set(updates)
+        .where(eq(usersTable.clerkId, userId))
+        .returning();
+    }
+    
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     res.json(formatUser(user));
   } catch (err) {

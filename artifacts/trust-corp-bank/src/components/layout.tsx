@@ -1,58 +1,101 @@
 import { Link, useLocation } from "wouter";
-import { Home, Activity, Send, CreditCard, User, Bell } from "lucide-react";
+import { Home, Activity, Send, CreditCard, User, Bell, RefreshCw } from "lucide-react";
 import { useListNotifications, getListNotificationsQueryKey } from "@workspace/api-client-react";
+import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useUser } from "@clerk/react";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+
+const NAV_ITEMS = [
+  { href: "/activity", icon: Activity, label: "Activity" },
+  { href: "/transfer", icon: Send, label: "Transfer" },
+  { href: "/home",     icon: Home,     label: "Home", primary: true },
+  { href: "/cards",    icon: CreditCard, label: "Cards" },
+  { href: "/profile",  icon: User,     label: "Profile" },
+];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const queryClient = useQueryClient();
+  const { user: clerkUser } = useUser();
+
   const { data: notifications } = useListNotifications({ query: { queryKey: getListNotificationsQueryKey() } });
+  const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
 
-  const unreadCount = notifications?.filter(n => !n.read).length || 0;
+  // Sync Clerk profile info to our backend on first load
+  useEffect(() => {
+    if (!clerkUser || !me) return;
+    const clerkName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ");
+    const clerkEmail = clerkUser.primaryEmailAddress?.emailAddress ?? "";
+    const needsSync = (me.fullName === "User" || me.fullName === "") || (!me.email && clerkEmail);
+    if (needsSync && clerkName) {
+      fetch("/api/users/me", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ fullName: clerkName || me.fullName, email: clerkEmail || me.email }),
+      }).then(() => queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() }));
+    }
+  }, [clerkUser?.id, me?.fullName]);
 
-  const navItems = [
-    { href: "/home", icon: Home, label: "Home" },
-    { href: "/activity", icon: Activity, label: "Activity" },
-    { href: "/transfer", icon: Send, label: "Transfer" },
-    { href: "/cards", icon: CreditCard, label: "Cards" },
-    { href: "/profile", icon: User, label: "Profile" },
-  ];
+  const unreadCount = notifications?.filter((n) => !n.read).length ?? 0;
 
   return (
-    <div className="flex justify-center w-full min-h-[100dvh] bg-black/50">
-      <div className="w-full max-w-[430px] bg-background min-h-[100dvh] flex flex-col relative shadow-2xl overflow-hidden">
+    <div className="flex justify-center w-full min-h-[100dvh] bg-[#050810]">
+      {/* Mobile container — full width on small, max 430 centered on large */}
+      <div className="w-full sm:max-w-[430px] bg-background min-h-[100dvh] flex flex-col relative shadow-2xl overflow-hidden">
+
         {/* Top Bar */}
-        <header className="px-6 py-4 flex items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur-md">
-          <div className="text-lg font-bold text-white tracking-tight">
-            Trust Corp
+        <header className="px-5 py-3.5 flex items-center justify-between sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-border/40">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
+              <span className="text-[11px] font-black text-white leading-none">TC</span>
+            </div>
+            <span className="text-base font-bold text-white tracking-tight">Trust Corp</span>
           </div>
-          <Link href="/notifications" className="relative p-2 -mr-2 text-muted-foreground hover:text-white transition-colors">
+          <Link href="/notifications" className="relative p-2 -mr-1 text-muted-foreground hover:text-white transition-colors rounded-xl hover:bg-card" data-testid="link-notifications">
             <Bell size={20} />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-destructive rounded-full border-2 border-background"></span>
+              <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 bg-destructive rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 border-background px-0.5">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
             )}
           </Link>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto pb-24">
+        {/* Scrollable Content */}
+        <main className="flex-1 overflow-y-auto pb-[76px]" id="main-content">
           {children}
         </main>
 
-        {/* Bottom Nav */}
-        <nav className="absolute bottom-0 left-0 right-0 bg-card/95 backdrop-blur-xl border-t border-border pb-safe">
-          <div className="flex items-center justify-around px-2 py-3">
-            {navItems.map((item) => {
-              const isActive = location === item.href;
-              const Icon = item.icon;
+        {/* Bottom Navigation */}
+        <nav className="absolute bottom-0 left-0 right-0 bg-card/95 backdrop-blur-2xl border-t border-border/60" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+          <div className="flex items-end justify-around px-1 pt-1 pb-2">
+            {NAV_ITEMS.map(({ href, icon: Icon, label, primary }) => {
+              const isActive = location === href || (href !== "/home" && location.startsWith(href));
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex flex-col items-center gap-1 min-w-[64px] p-2 rounded-xl transition-all ${
-                    isActive ? "text-primary" : "text-muted-foreground hover:text-white"
+                  key={href}
+                  href={href}
+                  data-testid={`nav-${label.toLowerCase()}`}
+                  className={`flex flex-col items-center gap-1 min-w-[56px] py-1 transition-all ${
+                    primary
+                      ? "relative -mt-4"
+                      : ""
                   }`}
                 >
-                  <Icon size={24} className={isActive ? "fill-primary/20" : ""} strokeWidth={isActive ? 2.5 : 2} />
-                  <span className="text-[10px] font-medium">{item.label}</span>
+                  {primary ? (
+                    <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all ${isActive ? "bg-primary shadow-primary/40" : "bg-primary/80 hover:bg-primary shadow-primary/20"}`}>
+                      <Icon size={26} className="text-white" strokeWidth={isActive ? 2.5 : 2} />
+                    </div>
+                  ) : (
+                    <div className={`w-11 h-8 rounded-xl flex items-center justify-center transition-all ${isActive ? "bg-primary/15" : "hover:bg-white/5"}`}>
+                      <Icon size={22} className={isActive ? "text-primary" : "text-muted-foreground"} strokeWidth={isActive ? 2.5 : 2} />
+                    </div>
+                  )}
+                  <span className={`text-[10px] font-medium leading-none ${primary ? "mt-1" : ""} ${isActive ? (primary ? "text-primary" : "text-primary") : "text-muted-foreground"}`}>
+                    {label}
+                  </span>
                 </Link>
               );
             })}

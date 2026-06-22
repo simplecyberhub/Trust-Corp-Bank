@@ -33,30 +33,44 @@ const clerkAppearance = {
   cssLayerName: "clerk",
   variables: {
     colorPrimary: "#1a56db",
-    colorBackground: "#111827",
+    colorBackground: "#0d1424",
     colorText: "#ffffff",
     colorTextSecondary: "#9ca3af",
-    colorInputBackground: "#1f2937",
+    colorInputBackground: "#1a2236",
     colorInputText: "#ffffff",
+    colorNeutral: "#6b7280",
+    borderRadius: "0.75rem",
+    fontSize: "15px",
   },
   elements: {
     rootBox: "w-full flex justify-center",
-    cardBox: "bg-card rounded-2xl w-[440px] max-w-full overflow-hidden",
+    cardBox: "w-full max-w-[440px]",
+    card: "bg-[#111827] border border-[#1f2d4a] shadow-2xl",
+    headerTitle: "text-white",
+    headerSubtitle: "text-gray-400",
+    socialButtonsBlockButton: "border-[#1f2d4a] bg-[#1a2236] text-white hover:bg-[#1f2d4a]",
+    dividerLine: "bg-[#1f2d4a]",
+    formFieldLabel: "text-gray-300",
+    formFieldInput: "bg-[#1a2236] border-[#1f2d4a] text-white",
+    footerActionLink: "text-blue-400",
   },
 };
 
-function SignInPage() {
+function AuthPage({ mode }: { mode: "sign-in" | "sign-up" }) {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
-      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
-    </div>
-  );
-}
-
-function SignUpPage() {
-  return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
-      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-8">
+      <div className="w-full max-w-[440px]">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/30">
+            <span className="text-2xl font-black text-white">TC</span>
+          </div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Trust Corp Bank</h1>
+          <p className="text-sm text-muted-foreground mt-1">Premium US Digital Banking</p>
+        </div>
+        {mode === "sign-in"
+          ? <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+          : <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />}
+      </div>
     </div>
   );
 }
@@ -93,7 +107,11 @@ function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
 
   if (!clerkPubKey) {
-    return <div>Missing Clerk Publishable Key</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-white text-center px-4">Clerk configuration missing.<br />Please add <code className="text-primary">VITE_CLERK_PUBLISHABLE_KEY</code>.</p>
+      </div>
+    );
   }
 
   return (
@@ -109,9 +127,9 @@ function ClerkProviderWithRoutes() {
       <QueryClientProvider client={queryClient}>
         <Switch>
           <Route path="/" component={HomeRedirect} />
-          <Route path="/sign-in/*?" component={SignInPage} />
-          <Route path="/sign-up/*?" component={SignUpPage} />
-          
+          <Route path="/sign-in/*?" component={() => <AuthPage mode="sign-in" />} />
+          <Route path="/sign-up/*?" component={() => <AuthPage mode="sign-up" />} />
+
           <Route path="/home"><ProtectedRoute component={Home} /></Route>
           <Route path="/activity"><ProtectedRoute component={Activity} /></Route>
           <Route path="/transfer"><ProtectedRoute component={Transfer} /></Route>
@@ -120,11 +138,8 @@ function ClerkProviderWithRoutes() {
           <Route path="/exchange"><ProtectedRoute component={Exchange} /></Route>
           <Route path="/notifications"><ProtectedRoute component={Notifications} /></Route>
           <Route path="/kyc"><ProtectedRoute component={Kyc} /></Route>
-          
-          {/* Fallback */}
-          <Route>
-            <Redirect to="/" />
-          </Route>
+
+          <Route><Redirect to="/" /></Route>
         </Switch>
       </QueryClientProvider>
     </ClerkProvider>

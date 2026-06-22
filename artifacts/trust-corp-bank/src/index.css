@@ -46,41 +46,111 @@
 }
 
 :root, .dark {
-  --background: 226 50% 8%; /* #0a0f1e */
+  --background: 224 50% 6%;
   --foreground: 0 0% 100%;
-  --card: 222 39% 11%; /* #111827 */
+  --card: 222 40% 10%;
   --card-foreground: 0 0% 100%;
   --card-border: 217 32% 17%;
-  --popover: 222 39% 11%;
+  --popover: 222 40% 10%;
   --popover-foreground: 0 0% 100%;
   --popover-border: 217 32% 17%;
-  --primary: 221 83% 53%; /* #1a56db */
+  --primary: 221 83% 53%;
   --primary-foreground: 0 0% 100%;
   --secondary: 217 32% 17%;
   --secondary-foreground: 0 0% 100%;
-  --muted: 217 32% 17%;
-  --muted-foreground: 215 20% 65%;
+  --muted: 217 32% 15%;
+  --muted-foreground: 215 20% 60%;
   --accent: 217 32% 17%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --border: 217 32% 17%;
-  --input: 217 32% 17%;
+  --border: 217 32% 15%;
+  --input: 217 32% 15%;
   --ring: 221 83% 53%;
   --radius: 0.75rem;
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  *, *::before, *::after {
+    @apply border-border box-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    /* Prevent pull-to-refresh on mobile */
+    overscroll-behavior-y: contain;
+    /* Safe areas for notched phones */
+    padding-top: env(safe-area-inset-top, 0px);
+    min-height: 100dvh;
   }
-  
-  /* Hide scrollbars for clean mobile look */
+
+  /* Prevent iOS tap highlight */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Hide scrollbars globally for clean look */
   ::-webkit-scrollbar {
-    width: 0px;
+    width: 0;
+    height: 0;
     background: transparent;
+  }
+  * {
+    scrollbar-width: none;
+  }
+
+  /* Focus visible outline — accessibility */
+  :focus-visible {
+    @apply outline outline-2 outline-primary/60 outline-offset-2 rounded;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Smooth number transitions */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Glass effect */
+  .glass {
+    background: rgba(17, 24, 39, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* Card shimmer skeleton animation */
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(222 40% 12%) 25%,
+      hsl(222 40% 16%) 50%,
+      hsl(222 40% 12%) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Floating bottom nav safe area */
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
   }
 }
