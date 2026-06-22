@@ -1,0 +1,1 @@
+- [Trust Corp Bank Project](trust-corp-bank-project.md) — hook signatures, Clerk setup, DB schema, exchange rates, and route registration patterns

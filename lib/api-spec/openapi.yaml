@@ -1,22 +1,27 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Trust Corp Bank API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: users
+  - name: accounts
+  - name: transactions
+  - name: beneficiaries
+  - name: cards
+  - name: notifications
+  - name: exchange
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +29,435 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: Not found
+    put:
+      operationId: updateMe
+      tags: [users]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserProfileUpdate"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /users/me/kyc:
+    post:
+      operationId: submitKyc
+      tags: [users]
+      summary: Submit KYC information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KycInput"
+      responses:
+        "200":
+          description: KYC submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /accounts:
+    get:
+      operationId: listAccounts
+      tags: [accounts]
+      summary: List all accounts for current user
+      responses:
+        "200":
+          description: Account list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BankAccount"
+    post:
+      operationId: createAccount
+      tags: [accounts]
+      summary: Open a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountInput"
+      responses:
+        "201":
+          description: Created account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankAccount"
+
+  /accounts/summary:
+    get:
+      operationId: getAccountSummary
+      tags: [accounts]
+      summary: Get aggregate account summary
+      responses:
+        "200":
+          description: Account summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountSummary"
+
+  /accounts/{accountId}:
+    get:
+      operationId: getAccount
+      tags: [accounts]
+      summary: Get a single account
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankAccount"
+        "404":
+          description: Not found
+
+  /transactions:
+    get:
+      operationId: listTransactions
+      tags: [transactions]
+      summary: List transactions
+      parameters:
+        - name: accountId
+          in: query
+          schema:
+            type: integer
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [credit, debit, transfer, topup, exchange]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionList"
+
+  /transactions/{txId}:
+    get:
+      operationId: getTransaction
+      tags: [transactions]
+      summary: Get a single transaction
+      parameters:
+        - name: txId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "404":
+          description: Not found
+
+  /transactions/send:
+    post:
+      operationId: sendMoney
+      tags: [transactions]
+      summary: Send money to another account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendInput"
+      responses:
+        "201":
+          description: Transfer completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "400":
+          description: Insufficient funds or invalid input
+
+  /transactions/topup:
+    post:
+      operationId: topUpAccount
+      tags: [transactions]
+      summary: Top up an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TopUpInput"
+      responses:
+        "201":
+          description: Top-up completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/activity:
+    get:
+      operationId: getRecentActivity
+      tags: [transactions]
+      summary: Get recent activity feed
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  /beneficiaries:
+    get:
+      operationId: listBeneficiaries
+      tags: [beneficiaries]
+      summary: List saved beneficiaries
+      responses:
+        "200":
+          description: Beneficiary list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Beneficiary"
+    post:
+      operationId: createBeneficiary
+      tags: [beneficiaries]
+      summary: Add a new beneficiary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeneficiaryInput"
+      responses:
+        "201":
+          description: Created beneficiary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beneficiary"
+
+  /beneficiaries/{beneficiaryId}:
+    delete:
+      operationId: deleteBeneficiary
+      tags: [beneficiaries]
+      summary: Remove a beneficiary
+      parameters:
+        - name: beneficiaryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /cards:
+    get:
+      operationId: listCards
+      tags: [cards]
+      summary: List user cards
+      responses:
+        "200":
+          description: Card list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Card"
+    post:
+      operationId: createCard
+      tags: [cards]
+      summary: Issue a new card
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardInput"
+      responses:
+        "201":
+          description: Created card
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+
+  /cards/{cardId}:
+    get:
+      operationId: getCard
+      tags: [cards]
+      summary: Get card details
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Card
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+    patch:
+      operationId: updateCard
+      tags: [cards]
+      summary: Freeze or update card
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardUpdate"
+      responses:
+        "200":
+          description: Updated card
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications
+      responses:
+        "200":
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{notificationId}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "204":
+          description: Done
+
+  /exchange/rates:
+    get:
+      operationId: getExchangeRates
+      tags: [exchange]
+      summary: Get live exchange rates
+      parameters:
+        - name: base
+          in: query
+          schema:
+            type: string
+            default: USD
+      responses:
+        "200":
+          description: Exchange rates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangeRates"
+
+  /exchange/convert:
+    post:
+      operationId: convertCurrency
+      tags: [exchange]
+      summary: Convert between currencies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversionInput"
+      responses:
+        "200":
+          description: Conversion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversionResult"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +465,379 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    UserProfile:
+      type: object
+      required: [id, clerkId, email, fullName, kycStatus, createdAt]
+      properties:
+        id:
+          type: integer
+        clerkId:
+          type: string
+        email:
+          type: string
+        fullName:
+          type: string
+        phone:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        kycStatus:
+          type: string
+          enum: [pending, submitted, approved, rejected]
+        address:
+          type: ["string", "null"]
+        dateOfBirth:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    UserProfileUpdate:
+      type: object
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        dateOfBirth:
+          type: string
+
+    KycInput:
+      type: object
+      required: [fullName, dateOfBirth, address, idType, idNumber]
+      properties:
+        fullName:
+          type: string
+        dateOfBirth:
+          type: string
+        address:
+          type: string
+        idType:
+          type: string
+          enum: [passport, drivers_license, national_id]
+        idNumber:
+          type: string
+        phone:
+          type: string
+
+    BankAccount:
+      type: object
+      required: [id, userId, accountNumber, accountType, currency, balance, status, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        accountNumber:
+          type: string
+        accountType:
+          type: string
+          enum: [fiat, savings, checking]
+        currency:
+          type: string
+        balance:
+          type: number
+        status:
+          type: string
+          enum: [active, inactive, frozen, closed]
+        nickname:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    AccountInput:
+      type: object
+      required: [accountType, currency]
+      properties:
+        accountType:
+          type: string
+          enum: [fiat, savings, checking]
+        currency:
+          type: string
+        nickname:
+          type: string
+
+    CurrencyBalance:
+      type: object
+      required: [currency, balance]
+      properties:
+        currency:
+          type: string
+        balance:
+          type: number
+
+    AccountSummary:
+      type: object
+      required: [totalBalanceUsd, accountCount, activeCount, currencies]
+      properties:
+        totalBalanceUsd:
+          type: number
+        accountCount:
+          type: integer
+        activeCount:
+          type: integer
+        currencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CurrencyBalance"
+
+    Transaction:
+      type: object
+      required: [id, accountId, type, amount, currency, status, description, createdAt]
+      properties:
+        id:
+          type: integer
+        accountId:
+          type: integer
+        type:
+          type: string
+          enum: [credit, debit, transfer, topup, exchange]
+        amount:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [pending, completed, failed, reversed]
+        description:
+          type: string
+        reference:
+          type: ["string", "null"]
+        recipientName:
+          type: ["string", "null"]
+        recipientAccount:
+          type: ["string", "null"]
+        senderName:
+          type: ["string", "null"]
+        balanceAfter:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    TransactionList:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    SendInput:
+      type: object
+      required: [fromAccountId, amount, currency, description]
+      properties:
+        fromAccountId:
+          type: integer
+        beneficiaryId:
+          type: ["integer", "null"]
+        recipientAccount:
+          type: ["string", "null"]
+        recipientName:
+          type: ["string", "null"]
+        amount:
+          type: number
+        currency:
+          type: string
+        description:
+          type: string
+
+    TopUpInput:
+      type: object
+      required: [accountId, amount, currency]
+      properties:
+        accountId:
+          type: integer
+        amount:
+          type: number
+        currency:
+          type: string
+        source:
+          type: string
+          default: external
+
+    Beneficiary:
+      type: object
+      required: [id, userId, name, accountNumber, bankName, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        accountNumber:
+          type: string
+        bankName:
+          type: string
+        currency:
+          type: string
+        avatarUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    BeneficiaryInput:
+      type: object
+      required: [name, accountNumber, bankName]
+      properties:
+        name:
+          type: string
+        accountNumber:
+          type: string
+        bankName:
+          type: string
+        currency:
+          type: string
+
+    Card:
+      type: object
+      required: [id, userId, accountId, cardType, last4, expiryMonth, expiryYear, status, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        accountId:
+          type: integer
+        cardType:
+          type: string
+          enum: [virtual, physical]
+        last4:
+          type: string
+        holderName:
+          type: string
+        expiryMonth:
+          type: integer
+        expiryYear:
+          type: integer
+        status:
+          type: string
+          enum: [active, frozen, cancelled]
+        network:
+          type: string
+          enum: [visa, mastercard]
+        spendLimit:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+
+    CardInput:
+      type: object
+      required: [accountId, cardType]
+      properties:
+        accountId:
+          type: integer
+        cardType:
+          type: string
+          enum: [virtual, physical]
+        network:
+          type: string
+          enum: [visa, mastercard]
+        spendLimit:
+          type: number
+
+    CardUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [active, frozen, cancelled]
+        spendLimit:
+          type: number
+
+    Notification:
+      type: object
+      required: [id, userId, title, message, type, read, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [transaction, security, kyc, system, promotion]
+        read:
+          type: boolean
+        createdAt:
+          type: string
+
+    ExchangeRateEntry:
+      type: object
+      required: [code, rate]
+      properties:
+        code:
+          type: string
+        rate:
+          type: number
+
+    ExchangeRates:
+      type: object
+      required: [base, entries, timestamp]
+      properties:
+        base:
+          type: string
+        timestamp:
+          type: integer
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExchangeRateEntry"
+
+    ConversionInput:
+      type: object
+      required: [fromCurrency, toCurrency, amount]
+      properties:
+        fromCurrency:
+          type: string
+        toCurrency:
+          type: string
+        amount:
+          type: number
+        fromAccountId:
+          type: ["integer", "null"]
+        toAccountId:
+          type: ["integer", "null"]
+        execute:
+          type: boolean
+          default: false
+
+    ConversionResult:
+      type: object
+      required: [fromCurrency, toCurrency, fromAmount, toAmount, rate, timestamp]
+      properties:
+        fromCurrency:
+          type: string
+        toCurrency:
+          type: string
+        fromAmount:
+          type: number
+        toAmount:
+          type: number
+        rate:
+          type: number
+        fee:
+          type: number
+        timestamp:
+          type: integer
+        transactionId:
+          type: ["integer", "null"]
