@@ -36,6 +36,14 @@ import type {
   KycInput,
   ListTransactionsParams,
   Notification,
+  OtpSendInput,
+  OtpSendResult,
+  OtpVerifyInput,
+  OtpVerifyResult,
+  PinOperationResult,
+  PinSetupInput,
+  PinVerifyInput,
+  PinVerifyResult,
   SendInput,
   TopUpInput,
   Transaction,
@@ -1919,5 +1927,289 @@ export const useConvertCurrency = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getConvertCurrencyMutationOptions(options));
+    }
+
+export const getSetupPinUrl = () => {
+
+
+
+
+  return `/api/users/me/pin`
+}
+
+/**
+ * @summary Set or update transaction PIN
+ */
+export const setupPin = async (pinSetupInput: PinSetupInput, options?: RequestInit): Promise<PinOperationResult> => {
+
+  return customFetch<PinOperationResult>(getSetupPinUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pinSetupInput,)
+  }
+);}
+
+
+
+
+export const getSetupPinMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setupPin>>, TError,{data: BodyType<PinSetupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setupPin>>, TError,{data: BodyType<PinSetupInput>}, TContext> => {
+
+const mutationKey = ['setupPin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setupPin>>, {data: BodyType<PinSetupInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setupPin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetupPinMutationResult = NonNullable<Awaited<ReturnType<typeof setupPin>>>
+    export type SetupPinMutationBody = BodyType<PinSetupInput>
+    export type SetupPinMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Set or update transaction PIN
+ */
+export const useSetupPin = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setupPin>>, TError,{data: BodyType<PinSetupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setupPin>>,
+        TError,
+        {data: BodyType<PinSetupInput>},
+        TContext
+      > => {
+      return useMutation(getSetupPinMutationOptions(options));
+    }
+
+export const getVerifyPinUrl = () => {
+
+
+
+
+  return `/api/users/me/pin/verify`
+}
+
+/**
+ * @summary Verify transaction PIN
+ */
+export const verifyPin = async (pinVerifyInput: PinVerifyInput, options?: RequestInit): Promise<PinVerifyResult> => {
+
+  return customFetch<PinVerifyResult>(getVerifyPinUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pinVerifyInput,)
+  }
+);}
+
+
+
+
+export const getVerifyPinMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyPin>>, TError,{data: BodyType<PinVerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyPin>>, TError,{data: BodyType<PinVerifyInput>}, TContext> => {
+
+const mutationKey = ['verifyPin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyPin>>, {data: BodyType<PinVerifyInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyPin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyPinMutationResult = NonNullable<Awaited<ReturnType<typeof verifyPin>>>
+    export type VerifyPinMutationBody = BodyType<PinVerifyInput>
+    export type VerifyPinMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Verify transaction PIN
+ */
+export const useVerifyPin = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyPin>>, TError,{data: BodyType<PinVerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyPin>>,
+        TError,
+        {data: BodyType<PinVerifyInput>},
+        TContext
+      > => {
+      return useMutation(getVerifyPinMutationOptions(options));
+    }
+
+export const getSendOtpUrl = () => {
+
+
+
+
+  return `/api/users/me/otp/send`
+}
+
+/**
+ * @summary Request an OTP code
+ */
+export const sendOtp = async (otpSendInput: OtpSendInput, options?: RequestInit): Promise<OtpSendResult> => {
+
+  return customFetch<OtpSendResult>(getSendOtpUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      otpSendInput,)
+  }
+);}
+
+
+
+
+export const getSendOtpMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendOtp>>, TError,{data: BodyType<OtpSendInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendOtp>>, TError,{data: BodyType<OtpSendInput>}, TContext> => {
+
+const mutationKey = ['sendOtp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendOtp>>, {data: BodyType<OtpSendInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendOtp(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendOtpMutationResult = NonNullable<Awaited<ReturnType<typeof sendOtp>>>
+    export type SendOtpMutationBody = BodyType<OtpSendInput>
+    export type SendOtpMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Request an OTP code
+ */
+export const useSendOtp = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendOtp>>, TError,{data: BodyType<OtpSendInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendOtp>>,
+        TError,
+        {data: BodyType<OtpSendInput>},
+        TContext
+      > => {
+      return useMutation(getSendOtpMutationOptions(options));
+    }
+
+export const getVerifyOtpUrl = () => {
+
+
+
+
+  return `/api/users/me/otp/verify`
+}
+
+/**
+ * @summary Verify an OTP code
+ */
+export const verifyOtp = async (otpVerifyInput: OtpVerifyInput, options?: RequestInit): Promise<OtpVerifyResult> => {
+
+  return customFetch<OtpVerifyResult>(getVerifyOtpUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      otpVerifyInput,)
+  }
+);}
+
+
+
+
+export const getVerifyOtpMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyOtp>>, TError,{data: BodyType<OtpVerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyOtp>>, TError,{data: BodyType<OtpVerifyInput>}, TContext> => {
+
+const mutationKey = ['verifyOtp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyOtp>>, {data: BodyType<OtpVerifyInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyOtp(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyOtpMutationResult = NonNullable<Awaited<ReturnType<typeof verifyOtp>>>
+    export type VerifyOtpMutationBody = BodyType<OtpVerifyInput>
+    export type VerifyOtpMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Verify an OTP code
+ */
+export const useVerifyOtp = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyOtp>>, TError,{data: BodyType<OtpVerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyOtp>>,
+        TError,
+        {data: BodyType<OtpVerifyInput>},
+        TContext
+      > => {
+      return useMutation(getVerifyOtpMutationOptions(options));
     }
 

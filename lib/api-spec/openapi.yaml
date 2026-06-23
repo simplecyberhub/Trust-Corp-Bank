@@ -458,6 +458,82 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConversionResult"
 
+  /users/me/pin:
+    post:
+      operationId: setupPin
+      tags: [users]
+      summary: Set or update transaction PIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinSetupInput"
+      responses:
+        "200":
+          description: PIN set successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PinOperationResult"
+
+  /users/me/pin/verify:
+    post:
+      operationId: verifyPin
+      tags: [users]
+      summary: Verify transaction PIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinVerifyInput"
+      responses:
+        "200":
+          description: PIN verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PinVerifyResult"
+
+  /users/me/otp/send:
+    post:
+      operationId: sendOtp
+      tags: [users]
+      summary: Request an OTP code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpSendInput"
+      responses:
+        "200":
+          description: OTP sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpSendResult"
+
+  /users/me/otp/verify:
+    post:
+      operationId: verifyOtp
+      tags: [users]
+      summary: Verify an OTP code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerifyInput"
+      responses:
+        "200":
+          description: OTP verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpVerifyResult"
+
 components:
   schemas:
     HealthStatus:
@@ -469,7 +545,7 @@ components:
 
     UserProfile:
       type: object
-      required: [id, clerkId, email, fullName, kycStatus, createdAt]
+      required: [id, clerkId, email, fullName, kycStatus, role, hasPin, phoneVerified, createdAt]
       properties:
         id:
           type: integer
@@ -490,6 +566,12 @@ components:
           type: ["string", "null"]
         dateOfBirth:
           type: ["string", "null"]
+        role:
+          type: string
+        hasPin:
+          type: boolean
+        phoneVerified:
+          type: boolean
         createdAt:
           type: string
         updatedAt:
@@ -841,3 +923,74 @@ components:
           type: integer
         transactionId:
           type: ["integer", "null"]
+
+    PinSetupInput:
+      type: object
+      required: [pin]
+      properties:
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 6
+
+    PinOperationResult:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    PinVerifyInput:
+      type: object
+      required: [pin]
+      properties:
+        pin:
+          type: string
+
+    PinVerifyResult:
+      type: object
+      required: [valid]
+      properties:
+        valid:
+          type: boolean
+        attemptsRemaining:
+          type: integer
+        locked:
+          type: boolean
+
+    OtpSendInput:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [phone_verify, transfer_auth]
+
+    OtpSendResult:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        code:
+          type: ["string", "null"]
+        expiresIn:
+          type: integer
+
+    OtpVerifyInput:
+      type: object
+      required: [code, type]
+      properties:
+        code:
+          type: string
+        type:
+          type: string
+
+    OtpVerifyResult:
+      type: object
+      required: [valid]
+      properties:
+        valid:
+          type: boolean

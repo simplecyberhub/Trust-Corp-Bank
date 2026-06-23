@@ -29,6 +29,9 @@ export const GetMeResponse = zod.object({
   "kycStatus": zod.enum(['pending', 'submitted', 'approved', 'rejected']),
   "address": zod.string().nullish(),
   "dateOfBirth": zod.string().nullish(),
+  "role": zod.string(),
+  "hasPin": zod.boolean(),
+  "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })
@@ -54,6 +57,9 @@ export const UpdateMeResponse = zod.object({
   "kycStatus": zod.enum(['pending', 'submitted', 'approved', 'rejected']),
   "address": zod.string().nullish(),
   "dateOfBirth": zod.string().nullish(),
+  "role": zod.string(),
+  "hasPin": zod.boolean(),
+  "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })
@@ -81,6 +87,9 @@ export const SubmitKycResponse = zod.object({
   "kycStatus": zod.enum(['pending', 'submitted', 'approved', 'rejected']),
   "address": zod.string().nullish(),
   "dateOfBirth": zod.string().nullish(),
+  "role": zod.string(),
+  "hasPin": zod.boolean(),
+  "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })
@@ -451,6 +460,65 @@ export const ConvertCurrencyResponse = zod.object({
   "fee": zod.number().optional(),
   "timestamp": zod.number(),
   "transactionId": zod.number().nullish()
+})
+
+
+/**
+ * @summary Set or update transaction PIN
+ */
+export const setupPinBodyPinMin = 4;
+export const setupPinBodyPinMax = 6;
+
+
+
+export const SetupPinBody = zod.object({
+  "pin": zod.string().min(setupPinBodyPinMin).max(setupPinBodyPinMax)
+})
+
+export const SetupPinResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Verify transaction PIN
+ */
+export const VerifyPinBody = zod.object({
+  "pin": zod.string()
+})
+
+export const VerifyPinResponse = zod.object({
+  "valid": zod.boolean(),
+  "attemptsRemaining": zod.number().optional(),
+  "locked": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Request an OTP code
+ */
+export const SendOtpBody = zod.object({
+  "type": zod.enum(['phone_verify', 'transfer_auth'])
+})
+
+export const SendOtpResponse = zod.object({
+  "message": zod.string(),
+  "code": zod.string().nullish(),
+  "expiresIn": zod.number().optional()
+})
+
+
+/**
+ * @summary Verify an OTP code
+ */
+export const VerifyOtpBody = zod.object({
+  "code": zod.string(),
+  "type": zod.string()
+})
+
+export const VerifyOtpResponse = zod.object({
+  "valid": zod.boolean()
 })
 
 

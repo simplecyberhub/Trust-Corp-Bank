@@ -45,19 +45,16 @@ router.put("/users/me", async (req, res): Promise<void> => {
   if (!parse.success) { res.status(400).json({ error: parse.error.message }); return; }
 
   try {
-    // Try to update first; if not found, upsert (handles race condition on first login sync)
     const existing = await db.select().from(usersTable).where(eq(usersTable.clerkId, userId)).limit(1);
-    
+
     let user;
     if (existing.length === 0) {
-      // First-time: create the user with info from the PUT body
       const email = (parse.data as any).email ?? "";
       const fullName = (parse.data as any).fullName ?? "User";
       [user] = await db.insert(usersTable)
         .values({ clerkId: userId, email, fullName, ...parse.data })
         .returning();
     } else {
-      // Strip undefined values to avoid overwriting with null
       const updates: Record<string, unknown> = { updatedAt: new Date() };
       for (const [k, v] of Object.entries(parse.data)) {
         if (v !== undefined && v !== null && v !== "") {
@@ -69,7 +66,7 @@ router.put("/users/me", async (req, res): Promise<void> => {
         .where(eq(usersTable.clerkId, userId))
         .returning();
     }
-    
+
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     res.json(formatUser(user));
   } catch (err) {
@@ -99,7 +96,7 @@ router.post("/users/me/kyc", async (req, res): Promise<void> => {
   }
 });
 
-function formatUser(user: typeof usersTable.$inferSelect) {
+export function formatUser(user: typeof usersTable.$inferSelect) {
   return {
     id: user.id,
     clerkId: user.clerkId,
@@ -110,6 +107,9 @@ function formatUser(user: typeof usersTable.$inferSelect) {
     kycStatus: user.kycStatus,
     address: user.address ?? null,
     dateOfBirth: user.dateOfBirth ?? null,
+    role: user.role,
+    hasPin: !!user.transactionPin,
+    phoneVerified: user.phoneVerified,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };

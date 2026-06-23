@@ -21,6 +21,9 @@ export interface UserProfile {
   address?: string | null;
   /** @nullable */
   dateOfBirth?: string | null;
+  role: string;
+  hasPin: boolean;
+  phoneVerified: boolean;
   createdAt: string;
   updatedAt?: string;
 }

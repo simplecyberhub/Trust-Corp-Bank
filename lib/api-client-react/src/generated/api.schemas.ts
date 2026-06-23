@@ -33,6 +33,9 @@ export interface UserProfile {
   address?: string | null;
   /** @nullable */
   dateOfBirth?: string | null;
+  role: string;
+  hasPin: boolean;
+  phoneVerified: boolean;
   createdAt: string;
   updatedAt?: string;
 }
@@ -342,6 +345,57 @@ export interface ConversionResult {
   timestamp: number;
   /** @nullable */
   transactionId?: number | null;
+}
+
+export interface PinSetupInput {
+  /**
+     * @minLength 4
+     * @maxLength 6
+     */
+  pin: string;
+}
+
+export interface PinOperationResult {
+  success: boolean;
+  message: string;
+}
+
+export interface PinVerifyInput {
+  pin: string;
+}
+
+export interface PinVerifyResult {
+  valid: boolean;
+  attemptsRemaining?: number;
+  locked?: boolean;
+}
+
+export type OtpSendInputType = typeof OtpSendInputType[keyof typeof OtpSendInputType];
+
+
+export const OtpSendInputType = {
+  phone_verify: 'phone_verify',
+  transfer_auth: 'transfer_auth',
+} as const;
+
+export interface OtpSendInput {
+  type: OtpSendInputType;
+}
+
+export interface OtpSendResult {
+  message: string;
+  /** @nullable */
+  code?: string | null;
+  expiresIn?: number;
+}
+
+export interface OtpVerifyInput {
+  code: string;
+  type: string;
+}
+
+export interface OtpVerifyResult {
+  valid: boolean;
 }
 
 export type ListTransactionsParams = {
