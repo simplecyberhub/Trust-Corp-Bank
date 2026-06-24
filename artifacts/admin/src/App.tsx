@@ -1,9 +1,9 @@
+import React from "react";
 import { Switch, Route, Redirect, useLocation, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ClerkProvider, SignIn, useUser, useAuth } from "@clerk/react";
-import { publishableKeyFromHost } from "@clerk/react/internal";
+import { ClerkProvider, SignIn, useUser } from "@clerk/react";
 import { Dashboard } from "@/pages/dashboard";
 import { Users } from "@/pages/users";
 import { Transactions } from "@/pages/transactions";
@@ -14,15 +14,51 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
 
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
-
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ?? "";
+const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
 function stripBase(path: string): string {
   return basePath && path.startsWith(basePath) ? path.slice(basePath.length) || "/" : path;
+}
+
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[Admin ErrorBoundary]", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gray-950 flex items-center justify-center px-6">
+          <div className="text-center max-w-sm">
+            <div className="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <h2 className="text-white font-bold text-lg mb-2">Something went wrong</h2>
+            <p className="text-sm text-gray-400 mb-6">
+              {this.state.error?.message ?? "An unexpected error occurred."}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors"
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function SignInPage() {
@@ -44,7 +80,6 @@ function SignInPage() {
 
 function AdminGate({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useUser();
-  const [, setLocation] = useLocation();
 
   if (!isLoaded) {
     return (
@@ -97,16 +132,16 @@ function ClerkProviderWithRoutes() {
         <Switch>
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/">
-            <AppLayout><Dashboard /></AppLayout>
+            <AppLayout><ErrorBoundary><Dashboard /></ErrorBoundary></AppLayout>
           </Route>
           <Route path="/users">
-            <AppLayout><Users /></AppLayout>
+            <AppLayout><ErrorBoundary><Users /></ErrorBoundary></AppLayout>
           </Route>
           <Route path="/transactions">
-            <AppLayout><Transactions /></AppLayout>
+            <AppLayout><ErrorBoundary><Transactions /></ErrorBoundary></AppLayout>
           </Route>
           <Route path="/accounts">
-            <AppLayout><Accounts /></AppLayout>
+            <AppLayout><ErrorBoundary><Accounts /></ErrorBoundary></AppLayout>
           </Route>
           <Route><Redirect to="/" /></Route>
         </Switch>
@@ -119,7 +154,9 @@ function App() {
   return (
     <TooltipProvider>
       <WouterRouter base={basePath}>
-        <ClerkProviderWithRoutes />
+        <ErrorBoundary>
+          <ClerkProviderWithRoutes />
+        </ErrorBoundary>
       </WouterRouter>
       <Toaster />
     </TooltipProvider>

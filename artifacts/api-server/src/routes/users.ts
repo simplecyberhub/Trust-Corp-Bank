@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, accountsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { randomInt } from "crypto";
 import {
   GetMeResponse,
   UpdateMeBody,
@@ -10,10 +11,30 @@ import {
 
 const router = Router();
 
+function genAccountNumber(): string {
+  return String(randomInt(1000000000, 9999999999));
+}
+
 async function getOrCreateUser(clerkId: string, email: string, fullName: string) {
   const existing = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId)).limit(1);
   if (existing.length > 0) return existing[0];
+
   const [created] = await db.insert(usersTable).values({ clerkId, email, fullName }).returning();
+
+  try {
+    await db.insert(accountsTable).values({
+      userId: created.id,
+      accountNumber: genAccountNumber(),
+      accountType: "checking",
+      currency: "USD",
+      nickname: "Primary Checking",
+      balance: 0,
+      status: "active",
+    });
+  } catch (err) {
+    /* non-fatal — user created, account provisioning can be retried */
+  }
+
   return created;
 }
 
@@ -30,7 +51,32 @@ router.get("/users/me", async (req, res): Promise<void> => {
       res.json(formatUser(user));
       return;
     }
-    res.json(formatUser(users[0]));
+
+    const user = users[0];
+
+    const existingAccounts = await db
+      .select({ id: accountsTable.id })
+      .from(accountsTable)
+      .where(eq(accountsTable.userId, user.id))
+      .limit(1);
+
+    if (existingAccounts.length === 0) {
+      try {
+        await db.insert(accountsTable).values({
+          userId: user.id,
+          accountNumber: genAccountNumber(),
+          accountType: "checking",
+          currency: "USD",
+          nickname: "Primary Checking",
+          balance: 0,
+          status: "active",
+        });
+      } catch {
+        /* ignore duplicate */
+      }
+    }
+
+    res.json(formatUser(user));
   } catch (err) {
     req.log.error({ err }, "getMe error");
     res.status(500).json({ error: "Internal server error" });

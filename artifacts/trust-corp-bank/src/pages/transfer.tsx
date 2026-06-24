@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   useListAccounts, useSendMoney, useTopUpAccount,
-  useListBeneficiaries, useCreateBeneficiary, useDeleteBeneficiary,
+  useListBeneficiaries, useCreateBeneficiary, useDeleteBeneficiary, useCreateAccount,
   getListAccountsQueryKey, getListBeneficiariesQueryKey, getGetRecentActivityQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, useSearch } from "wouter";
-import { Send, Plus, Trash2, ArrowDownToLine, X } from "lucide-react";
+import { Send, Plus, Trash2, ArrowDownToLine, X, Building2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Tab = "send" | "topup";
@@ -139,11 +139,39 @@ export function Transfer() {
     );
   };
 
+  const createAccount = useCreateAccount();
+
+  const handleCreateAccount = () => {
+    createAccount.mutate(
+      { data: { accountType: "checking", currency: "USD", nickname: "Primary Checking" } },
+      {
+        onSuccess: () => {
+          toast({ title: "Account created", description: "Your Primary Checking account is ready." });
+          queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey() });
+        },
+        onError: (err: any) => toast({ title: "Failed to create account", description: err?.data?.error ?? err?.message, variant: "destructive" }),
+      },
+    );
+  };
+
   const NoAccountBanner = () => (
-    <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 text-sm text-orange-300">
-      No active accounts available.{" "}
-      <button type="button" onClick={() => setLocation("/home")} className="underline text-orange-400 font-medium">
-        Create one first.
+    <div className="bg-card border border-border rounded-2xl p-5 text-center space-y-3">
+      <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto border border-primary/20">
+        <Building2 size={22} className="text-primary" />
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-white">No active accounts</p>
+        <p className="text-xs text-muted-foreground mt-0.5">You need a bank account to send or receive money.</p>
+      </div>
+      <button
+        type="button"
+        onClick={handleCreateAccount}
+        disabled={createAccount.isPending}
+        className="w-full bg-primary text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
+      >
+        {createAccount.isPending
+          ? <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Opening…</>
+          : <><Plus size={15} />Open Primary Checking Account</>}
       </button>
     </div>
   );

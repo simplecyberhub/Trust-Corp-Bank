@@ -47,25 +47,25 @@
 
 :root, .dark {
   --background: 224 50% 6%;
-  --foreground: 0 0% 100%;
+  --foreground: 0 0% 98%;
   --card: 222 40% 10%;
-  --card-foreground: 0 0% 100%;
-  --card-border: 217 32% 17%;
+  --card-foreground: 0 0% 98%;
+  --card-border: 217 35% 20%;
   --popover: 222 40% 10%;
-  --popover-foreground: 0 0% 100%;
-  --popover-border: 217 32% 17%;
+  --popover-foreground: 0 0% 98%;
+  --popover-border: 217 35% 20%;
   --primary: 221 83% 53%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 217 32% 17%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 217 32% 15%;
-  --muted-foreground: 215 20% 60%;
-  --accent: 217 32% 17%;
-  --accent-foreground: 0 0% 100%;
+  --secondary: 217 35% 18%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 217 35% 14%;
+  --muted-foreground: 215 25% 68%;
+  --accent: 217 35% 18%;
+  --accent-foreground: 0 0% 98%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --border: 217 32% 15%;
-  --input: 217 32% 15%;
+  --border: 217 35% 18%;
+  --input: 217 38% 14%;
   --ring: 221 83% 53%;
   --radius: 0.75rem;
 }
@@ -77,24 +77,19 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    /* Smooth scrolling */
     scroll-behavior: smooth;
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    /* Prevent pull-to-refresh on mobile */
     overscroll-behavior-y: contain;
-    /* Safe areas for notched phones */
     padding-top: env(safe-area-inset-top, 0px);
     min-height: 100dvh;
   }
 
-  /* Prevent iOS tap highlight */
   * {
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Hide scrollbars globally for clean look */
   ::-webkit-scrollbar {
     width: 0;
     height: 0;
@@ -104,9 +99,31 @@
     scrollbar-width: none;
   }
 
-  /* Focus visible outline — accessibility */
   :focus-visible {
     @apply outline outline-2 outline-primary/60 outline-offset-2 rounded;
+  }
+
+  /* Ensure all inputs and selects are visually distinct from background */
+  input, textarea, select {
+    color: hsl(0 0% 98%);
+  }
+
+  /* Placeholder text — visible but clearly secondary */
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(215 20% 50%);
+  }
+
+  /* Select dropdown content dark styling */
+  [role="listbox"],
+  [role="option"] {
+    background-color: hsl(222 40% 10%);
+    color: hsl(0 0% 98%);
+  }
+
+  /* Labels — bright enough to read */
+  label {
+    color: hsl(215 25% 72%);
   }
 }
 
@@ -119,20 +136,17 @@
     display: none;
   }
 
-  /* Smooth number transitions */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
 
-  /* Glass effect */
   .glass {
     background: rgba(17, 24, 39, 0.7);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
   }
 
-  /* Card shimmer skeleton animation */
   .skeleton-shimmer {
     background: linear-gradient(
       90deg,
@@ -149,8 +163,15 @@
     100% { background-position: -200% 0; }
   }
 
-  /* Floating bottom nav safe area */
   .pb-safe {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+  }
+
+  /* Text visibility helpers */
+  .text-bright {
+    color: hsl(0 0% 98%);
+  }
+  .text-dim {
+    color: hsl(215 25% 68%);
   }
 }
