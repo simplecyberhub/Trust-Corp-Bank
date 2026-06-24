@@ -68,7 +68,7 @@ export function Profile() {
 
   const badge = kycBadge();
 
-  const InfoRow = ({
+  const EditableRow = ({
     icon: Icon, label, fieldKey, value, type = "text",
   }: {
     icon: React.ElementType; label: string; fieldKey: keyof typeof fieldValues; value?: string | null; type?: string;
@@ -111,6 +111,18 @@ export function Profile() {
       </div>
     );
   };
+
+  const ReadOnlyRow = ({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: string | null }) => (
+    <div className="flex items-start gap-3 py-4 border-b border-border/50 last:border-0">
+      <div className="w-8 h-8 rounded-lg bg-background flex items-center justify-center shrink-0 mt-0.5">
+        <Icon size={15} className="text-muted-foreground" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-muted-foreground mb-1">{label}</p>
+        <p className="text-sm text-white font-medium truncate">{value || <span className="text-muted-foreground/60 text-xs italic font-normal">Not set</span>}</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="px-4 sm:px-6 py-4 pb-8 space-y-5">
@@ -156,10 +168,10 @@ export function Profile() {
       {/* Personal Information — editable */}
       <div className="bg-card rounded-2xl border border-border p-4">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Personal Information</h3>
-        <InfoRow icon={User} label="Full Name" fieldKey="fullName" value={user?.fullName} />
-        <InfoRow icon={Mail} label="Email Address" fieldKey="fullName" value={user?.email} />
-        <InfoRow icon={Phone} label="Phone Number" fieldKey="phone" value={user?.phone} />
-        <InfoRow icon={MapPin} label="Address" fieldKey="address" value={user?.address} />
+        <EditableRow icon={User} label="Full Name" fieldKey="fullName" value={user?.fullName} />
+        <ReadOnlyRow icon={Mail} label="Email Address" value={user?.email} />
+        <EditableRow icon={Phone} label="Phone Number" fieldKey="phone" value={user?.phone} />
+        <EditableRow icon={MapPin} label="Address" fieldKey="address" value={user?.address} />
         <div className="flex items-start gap-3 py-4 border-t border-border/50">
           <div className="w-8 h-8 rounded-lg bg-background flex items-center justify-center shrink-0 mt-0.5">
             <Calendar size={15} className="text-muted-foreground" />

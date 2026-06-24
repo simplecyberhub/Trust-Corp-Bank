@@ -24,7 +24,6 @@ export function Transfer() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const queryClient = useQueryClient();
-  // Read ?type=topup from URL (set by home page quick action)
   const initialTab: Tab = new URLSearchParams(search).get("type") === "topup" ? "topup" : "send";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
@@ -69,18 +68,34 @@ export function Transfer() {
   };
   const clearBeneficiary = () => { setSelectedBeneficiary(null); setSendRecipientName(""); setSendRecipientAccount(""); };
 
+  const selectedAccount = activeAccounts.find((a) => a.id === parseInt(sendFrom));
+
+  // Currency symbol for selected account
+  const currencySymbol = (() => {
+    if (!selectedAccount) return "$";
+    try {
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: selectedAccount.currency })
+        .formatToParts(0)
+        .find((p) => p.type === "currency")?.value ?? selectedAccount.currency;
+    } catch {
+      return selectedAccount.currency;
+    }
+  })();
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!sendFrom) { toast({ title: "Select an account", description: "Choose an active account to send from.", variant: "destructive" }); return; }
     if (!sendAmount || parseFloat(sendAmount) <= 0) { toast({ title: "Invalid amount", variant: "destructive" }); return; }
     if (!sendRecipientAccount || !sendRecipientName) { toast({ title: "Recipient required", description: "Enter the recipient's name and account number.", variant: "destructive" }); return; }
-    const account = activeAccounts.find((a) => a.id === parseInt(sendFrom));
-    if (account && parseFloat(sendAmount) > account.balance) { toast({ title: "Insufficient funds", description: `Balance: ${account.currency} ${account.balance.toFixed(2)}`, variant: "destructive" }); return; }
+    if (selectedAccount && parseFloat(sendAmount) > selectedAccount.balance) {
+      toast({ title: "Insufficient funds", description: `Balance: ${selectedAccount.currency} ${selectedAccount.balance.toFixed(2)}`, variant: "destructive" });
+      return;
+    }
     sendMoney.mutate(
-      { data: { fromAccountId: parseInt(sendFrom), amount: parseFloat(sendAmount), currency: account?.currency ?? "USD", description: sendDescription || "Transfer", recipientAccount: sendRecipientAccount, recipientName: sendRecipientName } },
+      { data: { fromAccountId: parseInt(sendFrom), amount: parseFloat(sendAmount), currency: selectedAccount?.currency ?? "USD", description: sendDescription || "Transfer", recipientAccount: sendRecipientAccount, recipientName: sendRecipientName } },
       {
         onSuccess: () => {
-          toast({ title: "Transfer sent", description: `${account?.currency} ${parseFloat(sendAmount).toFixed(2)} sent to ${sendRecipientName}.` });
+          toast({ title: "Transfer sent", description: `${selectedAccount?.currency} ${parseFloat(sendAmount).toFixed(2)} sent to ${sendRecipientName}.` });
           setSendAmount(""); setSendDescription(""); clearBeneficiary();
           queryClient.invalidateQueries({ queryKey: getListAccountsQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey() });
@@ -123,8 +138,6 @@ export function Transfer() {
       },
     );
   };
-
-  const selectedAccount = activeAccounts.find((a) => a.id === parseInt(sendFrom));
 
   const NoAccountBanner = () => (
     <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 text-sm text-orange-300">
@@ -244,7 +257,9 @@ export function Transfer() {
                       </SelectContent>
                     </Select>
                     {selectedAccount && (
-                      <p className="text-xs text-muted-foreground pl-1">Balance: <span className="text-white font-medium">{selectedAccount.currency} {selectedAccount.balance.toFixed(2)}</span></p>
+                      <p className="text-xs text-muted-foreground pl-1">
+                        Available: <span className="text-white font-medium">{selectedAccount.currency} {selectedAccount.balance.toFixed(2)}</span>
+                      </p>
                     )}
                   </>
                 )}
@@ -277,11 +292,36 @@ export function Transfer() {
               )}
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</Label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-muted-foreground pointer-events-none">$</span>
-                  <Input type="number" min="0.01" step="0.01" value={sendAmount} onChange={(e) => setSendAmount(e.target.value)} placeholder="0.00" className="bg-card border-border h-16 rounded-xl pl-10 text-3xl font-bold" data-testid="input-send-amount" />
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</Label>
+                  {selectedAccount && (
+                    <button
+                      type="button"
+                      onClick={() => setSendAmount(String(selectedAccount.balance))}
+                      className="text-xs text-primary font-medium px-2 py-0.5 bg-primary/10 rounded-full hover:bg-primary/20 transition-colors"
+                    >
+                      Max
+                    </button>
+                  )}
                 </div>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-muted-foreground pointer-events-none">
+                    {currencySymbol}
+                  </span>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={sendAmount}
+                    onChange={(e) => setSendAmount(e.target.value)}
+                    placeholder="0.00"
+                    className={`bg-card border-border h-16 rounded-xl pl-10 text-3xl font-bold ${selectedAccount && parseFloat(sendAmount) > selectedAccount.balance ? "border-destructive" : ""}`}
+                    data-testid="input-send-amount"
+                  />
+                </div>
+                {selectedAccount && parseFloat(sendAmount) > selectedAccount.balance && (
+                  <p className="text-xs text-destructive pl-1">Amount exceeds available balance</p>
+                )}
               </div>
 
               <div className="space-y-1.5">

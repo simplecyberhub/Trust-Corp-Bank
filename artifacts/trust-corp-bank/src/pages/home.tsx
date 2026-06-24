@@ -22,6 +22,13 @@ import {
 } from "@/components/ui/carousel";
 import { format } from "date-fns";
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning,";
+  if (hour < 17) return "Good afternoon,";
+  return "Good evening,";
+}
+
 export function Home() {
   const { data: user, isLoading: loadingUser } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
   const { data: summary, isLoading: loadingSummary } = useGetAccountSummary({ query: { queryKey: getGetAccountSummaryQueryKey() } });
@@ -36,7 +43,7 @@ export function Home() {
   const getTxIcon = (type: string) => {
     switch (type) {
       case "credit": return <ArrowDownLeft className="text-green-500" size={16} />;
-      case "debit": return <ArrowUpRight className="text-white" size={16} />;
+      case "debit": return <ArrowUpRight className="text-red-400" size={16} />;
       case "transfer": return <ArrowRightLeft className="text-primary" size={16} />;
       case "topup": return <Plus className="text-blue-400" size={16} />;
       case "exchange": return <RefreshCw className="text-purple-400" size={16} />;
@@ -44,11 +51,23 @@ export function Home() {
     }
   };
 
+  const getTxAmountColor = (type: string) => {
+    if (type === "credit" || type === "topup") return "text-green-500";
+    if (type === "debit" || type === "transfer") return "text-red-400";
+    return "text-white";
+  };
+
+  const getTxPrefix = (type: string) => {
+    if (type === "credit" || type === "topup") return "+";
+    if (type === "debit" || type === "transfer") return "−";
+    return "";
+  };
+
   return (
     <div className="px-6 py-2 space-y-8">
       {/* Greeting */}
       <section>
-        <h2 className="text-muted-foreground text-sm">Good morning,</h2>
+        <h2 className="text-muted-foreground text-sm">{getGreeting()}</h2>
         {loadingUser ? (
           <Skeleton className="h-8 w-48 mt-1" />
         ) : (
@@ -135,7 +154,7 @@ export function Home() {
       <section className="grid grid-cols-4 gap-4">
         {[
           { icon: Plus, label: "Top Up", href: "/transfer?type=topup" },
-          { icon: ArrowUpRight, label: "Transfer", href: "/transfer" },
+          { icon: Send, label: "Transfer", href: "/transfer" },
           { icon: RefreshCw, label: "Exchange", href: "/exchange" },
           { icon: MoreHorizontal, label: "More", href: "/profile" },
         ].map((action, i) => (
@@ -206,7 +225,7 @@ export function Home() {
             </div>
           ) : (
             activity?.slice(0, 5).map((tx) => (
-              <Link key={tx.id} href={`/activity`} className="flex items-center justify-between p-3 bg-card rounded-xl border border-border hover:bg-white/5 transition-colors">
+              <Link key={tx.id} href="/activity" className="flex items-center justify-between p-3 bg-card rounded-xl border border-border hover:bg-white/5 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center border border-border">
                     {getTxIcon(tx.type)}
@@ -216,8 +235,8 @@ export function Home() {
                     <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(tx.createdAt), 'MMM d')}</p>
                   </div>
                 </div>
-                <p className={`text-sm font-semibold ${tx.amount > 0 ? "text-green-500" : "text-white"}`}>
-                  {tx.amount > 0 ? "+" : ""}{formatCurrency(Math.abs(tx.amount), tx.currency)}
+                <p className={`text-sm font-semibold ${getTxAmountColor(tx.type)}`}>
+                  {getTxPrefix(tx.type)}{formatCurrency(Math.abs(tx.amount), tx.currency)}
                 </p>
               </Link>
             ))

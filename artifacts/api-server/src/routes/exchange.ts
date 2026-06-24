@@ -19,14 +19,12 @@ async function fetchRates(base: string = "USD"): Promise<Record<string, number>>
   }
 
   try {
-    // Use open.er-api.com free tier (no API key required)
     const resp = await fetch(`https://open.er-api.com/v6/latest/${base}`);
     if (!resp.ok) throw new Error("Rate fetch failed");
     const data = await resp.json() as { rates: Record<string, number>; time_last_update_unix: number };
     rateCache = { timestamp: now, rates: data.rates };
     return data.rates;
   } catch {
-    // Fallback to approximate rates if API unavailable
     return getFallbackRates(base);
   }
 }
@@ -92,30 +90,56 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
       const uid = await getUserId(clerkId);
       if (!uid) { res.status(404).json({ error: "User not found" }); return; }
 
-      const [fromAcc] = await db.select().from(accountsTable)
-        .where(and(eq(accountsTable.id, fromAccountId), eq(accountsTable.userId, uid)));
-      if (!fromAcc) { res.status(404).json({ error: "Source account not found" }); return; }
-      if (fromAcc.balance < amount) { res.status(400).json({ error: "Insufficient funds" }); return; }
+      const result = await db.transaction(async (trx) => {
+        const [fromAcc] = await trx.select().from(accountsTable)
+          .where(and(eq(accountsTable.id, fromAccountId), eq(accountsTable.userId, uid)));
+        if (!fromAcc) throw Object.assign(new Error("Source account not found"), { status: 404 });
+        if (fromAcc.balance < amount) throw Object.assign(new Error("Insufficient funds"), { status: 400 });
 
-      const [toAcc] = await db.select().from(accountsTable)
-        .where(and(eq(accountsTable.id, toAccountId), eq(accountsTable.userId, uid)));
-      if (!toAcc) { res.status(404).json({ error: "Destination account not found" }); return; }
+        const [toAcc] = await trx.select().from(accountsTable)
+          .where(and(eq(accountsTable.id, toAccountId), eq(accountsTable.userId, uid)));
+        if (!toAcc) throw Object.assign(new Error("Destination account not found"), { status: 404 });
 
-      const ref = "TCB" + randomBytes(4).toString("hex").toUpperCase();
-      await db.update(accountsTable).set({ balance: fromAcc.balance - amount, updatedAt: new Date() }).where(eq(accountsTable.id, fromAccountId));
-      await db.update(accountsTable).set({ balance: toAcc.balance + toAmount, updatedAt: new Date() }).where(eq(accountsTable.id, toAccountId));
+        const ref = "TCB" + randomBytes(6).toString("hex").toUpperCase();
+        const fromNewBalance = fromAcc.balance - amount;
+        const toNewBalance = toAcc.balance + toAmount;
 
-      const [tx] = await db.insert(transactionsTable).values({
-        accountId: fromAccountId,
-        type: "exchange",
-        amount,
-        currency: fromCurrency,
-        status: "completed",
-        description: `Currency exchange: ${fromCurrency} to ${toCurrency}`,
-        reference: ref,
-        balanceAfter: fromAcc.balance - amount,
-      }).returning();
-      transactionId = tx.id;
+        await trx.update(accountsTable)
+          .set({ balance: fromNewBalance, updatedAt: new Date() })
+          .where(eq(accountsTable.id, fromAccountId));
+
+        await trx.update(accountsTable)
+          .set({ balance: toNewBalance, updatedAt: new Date() })
+          .where(eq(accountsTable.id, toAccountId));
+
+        // Debit transaction on source account
+        const [debitTx] = await trx.insert(transactionsTable).values({
+          accountId: fromAccountId,
+          type: "exchange",
+          amount,
+          currency: fromCurrency,
+          status: "completed",
+          description: `Exchange: ${fromCurrency} → ${toCurrency}`,
+          reference: ref,
+          balanceAfter: fromNewBalance,
+        }).returning();
+
+        // Credit transaction on destination account
+        await trx.insert(transactionsTable).values({
+          accountId: toAccountId,
+          type: "exchange",
+          amount: toAmount,
+          currency: toCurrency,
+          status: "completed",
+          description: `Exchange received: ${fromCurrency} → ${toCurrency}`,
+          reference: ref,
+          balanceAfter: toNewBalance,
+        });
+
+        return debitTx;
+      });
+
+      transactionId = result.id;
     }
 
     res.json({
@@ -128,7 +152,9 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
       timestamp: Math.floor(Date.now() / 1000),
       transactionId,
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
+    if (err.status === 400) { res.status(400).json({ error: err.message }); return; }
     req.log.error({ err }, "convertCurrency error");
     res.status(500).json({ error: "Internal server error" });
   }
