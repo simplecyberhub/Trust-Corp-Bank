@@ -48,3 +48,34 @@ description: Hook signatures, Clerk setup, UX decisions, and API patterns for th
 
 - Bottom nav center item (Home) is a raised floating circle with primary color.
 - Clerk profile sync runs in layout `useEffect`, not in individual pages.
+
+## Transaction PIN system
+
+- DB columns already exist: `transactionPin` (text, scrypt hash), `pinAttempts` (int), `pinLockedUntil` (timestamp).
+- Hashing: Node built-in `crypto.scrypt` (no bcrypt dep needed). Format: `salt:hash` stored in DB.
+- Routes: `POST /api/users/me/pin` (set/change), `POST /api/users/me/pin/verify`, `DELETE /api/users/me/pin`.
+- Lockout: 5 wrong attempts → 30-min lockout via `pinLockedUntil`.
+- Frontend: PinDialog in Profile (set/change/remove); PinConfirmDialog in Transfer before send.
+- Auto-submits after 4th digit entered (200ms timeout via useEffect).
+- useEffect cleanup pattern: `if (condition) return; const t = setTimeout(...); return () => clearTimeout(t)` — NOT `if (condition) { ...; return cleanup; }` (TS7030).
+
+## SMS Gateway system
+
+- 2 new DB tables: `settings` (key-value for config) and `sms_logs` (per-message history).
+- Service: `artifacts/api-server/src/services/sms.ts` — reads config from DB, sends via provider.
+- 4 providers: TextBelt (key="textbelt" free, 1/day), Termii (free trial), Vonage (key:secret format), custom Webhook.
+- Config keys in settings table: `sms.provider`, `sms.apiKey`, `sms.senderId`, `sms.webhookUrl`, `sms.enabled`.
+- Admin routes: GET/POST `/api/admin/sms/config`, POST `/api/admin/sms/test`, GET `/api/admin/sms/logs`.
+- SMS fires async (fire-and-forget) after successful transfer/topup — never blocks the API response.
+- Admin SMS page at `/admin/sms` with provider cards, toggle enable/disable, test, logs table.
+
+## Admin routes registration
+
+- Admin router (`routes/admin.ts`) was NOT in `routes/index.ts` originally — had to add it manually.
+- All admin routes use `requireAdmin` middleware (checks `user.role === "admin"`).
+- `useAdminApi` hook in admin app is fully generic: `api.get<MyType>("/path")` — always pass type param.
+
+## DB schema additions pattern
+
+- New tables export from `lib/db/src/schema/<name>.ts`, then add `export * from "./<name>"` in `lib/db/src/schema/index.ts`.
+- After schema changes: `pnpm --filter @workspace/db run push` then `pnpm run typecheck:libs`.

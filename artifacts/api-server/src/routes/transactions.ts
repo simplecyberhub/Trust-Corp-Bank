@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, accountsTable, transactionsTable } from "@workspace/db";
+import { db, accountsTable, transactionsTable, usersTable } from "@workspace/db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import {
   ListTransactionsQueryParams,
@@ -10,11 +10,19 @@ import {
 } from "@workspace/api-zod";
 import { getUserId } from "./accounts";
 import { randomBytes } from "crypto";
+import { sendSms, formatSmsAlert } from "../services/sms";
 
 const router = Router();
 
 function genRef() {
   return "TCB" + randomBytes(6).toString("hex").toUpperCase();
+}
+
+async function getUserPhone(clerkId: string): Promise<string | null> {
+  try {
+    const [user] = await db.select({ phone: usersTable.phone }).from(usersTable).where(eq(usersTable.clerkId, clerkId)).limit(1);
+    return user?.phone ?? null;
+  } catch { return null; }
 }
 
 router.get("/transactions", async (req, res): Promise<void> => {
@@ -35,7 +43,6 @@ router.get("/transactions", async (req, res): Promise<void> => {
 
     const { limit = 20, offset = 0, accountId, type } = parse.data;
 
-    // Always scope to user's accounts for security
     const accountFilter = accountId
       ? and(eq(transactionsTable.accountId, accountId), inArray(transactionsTable.accountId, accountIds))
       : inArray(transactionsTable.accountId, accountIds);
@@ -94,7 +101,6 @@ router.get("/transactions/:txId", async (req, res): Promise<void> => {
     const uid = await getUserId(clerkId);
     if (!uid) { res.status(404).json({ error: "Not found" }); return; }
 
-    // Verify the transaction belongs to one of the user's accounts
     const userAccounts = await db.select({ id: accountsTable.id })
       .from(accountsTable).where(eq(accountsTable.userId, uid));
     const accountIds = userAccounts.map(a => a.id);
@@ -149,6 +155,20 @@ router.post("/transactions/send", async (req, res): Promise<void> => {
     });
 
     res.status(201).json(formatTx(tx));
+
+    // Fire SMS alert asynchronously after response is sent
+    getUserPhone(clerkId).then((phone) => {
+      if (phone) {
+        sendSms(phone, formatSmsAlert("transfer", {
+          currency,
+          amount,
+          recipient: recipientName ?? recipientAccount ?? "recipient",
+          ref: tx.reference ?? "",
+          balance: tx.balanceAfter ?? 0,
+        })).catch(() => {});
+      }
+    }).catch(() => {});
+
   } catch (err: any) {
     if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
     if (err.status === 400) { res.status(400).json({ error: err.message }); return; }
@@ -192,6 +212,19 @@ router.post("/transactions/topup", async (req, res): Promise<void> => {
     });
 
     res.status(201).json(formatTx(tx));
+
+    // Fire SMS alert asynchronously
+    getUserPhone(clerkId).then((phone) => {
+      if (phone) {
+        sendSms(phone, formatSmsAlert("topup", {
+          currency,
+          amount,
+          ref: tx.reference ?? "",
+          balance: tx.balanceAfter ?? 0,
+        })).catch(() => {});
+      }
+    }).catch(() => {});
+
   } catch (err: any) {
     if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
     req.log.error({ err }, "topUpAccount error");

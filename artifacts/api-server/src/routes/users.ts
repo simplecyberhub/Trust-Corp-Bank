@@ -2,7 +2,8 @@ import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db, usersTable, accountsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { randomInt } from "crypto";
+import { randomInt, scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
 import {
   GetMeResponse,
   UpdateMeBody,
@@ -10,9 +11,28 @@ import {
 } from "@workspace/api-zod";
 
 const router = Router();
+const scryptAsync = promisify(scrypt);
 
 function genAccountNumber(): string {
   return String(randomInt(1000000000, 9999999999));
+}
+
+async function hashPin(pin: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const hash = (await scryptAsync(pin, salt, 64)) as Buffer;
+  return `${salt}:${hash.toString("hex")}`;
+}
+
+async function verifyPin(pin: string, stored: string): Promise<boolean> {
+  try {
+    const [salt, hash] = stored.split(":");
+    if (!salt || !hash) return false;
+    const hashBuffer = Buffer.from(hash, "hex");
+    const derivedHash = (await scryptAsync(pin, salt, 64)) as Buffer;
+    return timingSafeEqual(hashBuffer, derivedHash);
+  } catch {
+    return false;
+  }
 }
 
 async function getOrCreateUser(clerkId: string, email: string, fullName: string) {
@@ -141,6 +161,130 @@ router.post("/users/me/kyc", async (req, res): Promise<void> => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+/* ─── PIN ROUTES ──────────────────────────────────────────────────────────── */
+
+router.post("/users/me/pin", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const { pin, currentPin } = req.body ?? {};
+
+  if (!pin || typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+    res.status(400).json({ error: "PIN must be exactly 4 digits." });
+    return;
+  }
+
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    if (user.transactionPin) {
+      if (!currentPin) { res.status(400).json({ error: "Current PIN required to change PIN." }); return; }
+      if (user.pinLockedUntil && user.pinLockedUntil > new Date()) {
+        const mins = Math.ceil((user.pinLockedUntil.getTime() - Date.now()) / 60_000);
+        res.status(429).json({ error: `PIN locked. Try again in ${mins} minute${mins > 1 ? "s" : ""}.` });
+        return;
+      }
+      const valid = await verifyPin(currentPin, user.transactionPin);
+      if (!valid) {
+        const attempts = (user.pinAttempts ?? 0) + 1;
+        const lockedUntil = attempts >= 5 ? new Date(Date.now() + 30 * 60 * 1000) : null;
+        await db.update(usersTable).set({ pinAttempts: attempts, pinLockedUntil: lockedUntil, updatedAt: new Date() }).where(eq(usersTable.clerkId, userId));
+        res.status(401).json({ error: `Incorrect PIN. ${5 - attempts} attempt${5 - attempts !== 1 ? "s" : ""} remaining.` });
+        return;
+      }
+    }
+
+    const hashed = await hashPin(pin);
+    await db.update(usersTable)
+      .set({ transactionPin: hashed, pinAttempts: 0, pinLockedUntil: null, updatedAt: new Date() })
+      .where(eq(usersTable.clerkId, userId));
+
+    res.json({ success: true, message: user.transactionPin ? "PIN changed successfully." : "PIN set successfully." });
+  } catch (err) {
+    req.log.error({ err }, "setPin error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/users/me/pin/verify", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const { pin } = req.body ?? {};
+  if (!pin || typeof pin !== "string") { res.status(400).json({ error: "PIN required." }); return; }
+
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (!user.transactionPin) { res.status(400).json({ error: "No PIN set. Please set a PIN first." }); return; }
+
+    if (user.pinLockedUntil && user.pinLockedUntil > new Date()) {
+      const mins = Math.ceil((user.pinLockedUntil.getTime() - Date.now()) / 60_000);
+      res.status(429).json({ error: `PIN locked. Try again in ${mins} minute${mins > 1 ? "s" : ""}.` });
+      return;
+    }
+
+    const valid = await verifyPin(pin, user.transactionPin);
+    if (!valid) {
+      const attempts = (user.pinAttempts ?? 0) + 1;
+      const lockedUntil = attempts >= 5 ? new Date(Date.now() + 30 * 60 * 1000) : null;
+      await db.update(usersTable).set({ pinAttempts: attempts, pinLockedUntil: lockedUntil, updatedAt: new Date() }).where(eq(usersTable.clerkId, userId));
+      if (lockedUntil) {
+        res.status(429).json({ error: "Too many incorrect attempts. PIN locked for 30 minutes." });
+      } else {
+        res.status(401).json({ error: `Incorrect PIN. ${5 - attempts} attempt${5 - attempts !== 1 ? "s" : ""} remaining.` });
+      }
+      return;
+    }
+
+    await db.update(usersTable).set({ pinAttempts: 0, pinLockedUntil: null, updatedAt: new Date() }).where(eq(usersTable.clerkId, userId));
+    res.json({ success: true, message: "PIN verified." });
+  } catch (err) {
+    req.log.error({ err }, "verifyPin error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/users/me/pin", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const { pin } = req.body ?? {};
+  if (!pin) { res.status(400).json({ error: "Current PIN required to remove PIN." }); return; }
+
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (!user.transactionPin) { res.status(400).json({ error: "No PIN is set." }); return; }
+
+    if (user.pinLockedUntil && user.pinLockedUntil > new Date()) {
+      res.status(429).json({ error: "PIN is locked. Cannot remove at this time." });
+      return;
+    }
+
+    const valid = await verifyPin(pin, user.transactionPin);
+    if (!valid) {
+      const attempts = (user.pinAttempts ?? 0) + 1;
+      const lockedUntil = attempts >= 5 ? new Date(Date.now() + 30 * 60 * 1000) : null;
+      await db.update(usersTable).set({ pinAttempts: attempts, pinLockedUntil: lockedUntil, updatedAt: new Date() }).where(eq(usersTable.clerkId, userId));
+      res.status(401).json({ error: `Incorrect PIN. ${5 - attempts} attempt${5 - attempts !== 1 ? "s" : ""} remaining.` });
+      return;
+    }
+
+    await db.update(usersTable)
+      .set({ transactionPin: null, pinAttempts: 0, pinLockedUntil: null, updatedAt: new Date() })
+      .where(eq(usersTable.clerkId, userId));
+
+    res.json({ success: true, message: "PIN removed." });
+  } catch (err) {
+    req.log.error({ err }, "removePin error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/* ─── HELPERS ─────────────────────────────────────────────────────────────── */
 
 export function formatUser(user: typeof usersTable.$inferSelect) {
   return {

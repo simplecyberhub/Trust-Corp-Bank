@@ -7,6 +7,7 @@ import beneficiariesRouter from "./beneficiaries";
 import cardsRouter from "./cards";
 import notificationsRouter from "./notifications";
 import exchangeRouter from "./exchange";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(beneficiariesRouter);
 router.use(cardsRouter);
 router.use(notificationsRouter);
 router.use(exchangeRouter);
+router.use(adminRouter);
 
 export default router;

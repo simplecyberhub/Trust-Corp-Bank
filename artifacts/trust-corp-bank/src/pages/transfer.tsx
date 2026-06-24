@@ -3,6 +3,7 @@ import {
   useListAccounts, useSendMoney, useTopUpAccount,
   useListBeneficiaries, useCreateBeneficiary, useDeleteBeneficiary, useCreateAccount,
   getListAccountsQueryKey, getListBeneficiariesQueryKey, getGetRecentActivityQueryKey,
+  useGetMe, getGetMeQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,13 +13,156 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, useSearch } from "wouter";
-import { Send, Plus, Trash2, ArrowDownToLine, X, Building2 } from "lucide-react";
+import { Send, Plus, Trash2, ArrowDownToLine, X, Building2, Lock, Delete, ShieldAlert, KeyRound } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Tab = "send" | "topup";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF", "NGN", "ZAR", "AED"];
 
+/* ─── PIN Keypad ─────────────────────────────────────────────────────────── */
+function PinKeypad({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
+  const append = (k: string) => {
+    if (k === "⌫") { onChange(value.slice(0, -1)); return; }
+    if (k === "" || value.length >= 4 || disabled) return;
+    onChange(value + k);
+  };
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-center gap-3">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${
+              value.length > i ? "border-primary bg-primary/20" : "border-border bg-card"
+            }`}
+          >
+            {value.length > i ? <div className="w-3 h-3 rounded-full bg-primary" /> : null}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2.5 max-w-[240px] mx-auto">
+        {keys.map((k, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => append(k)}
+            disabled={disabled || k === ""}
+            className={`h-14 rounded-2xl text-xl font-semibold transition-all active:scale-95 select-none ${
+              k === ""
+                ? "invisible"
+                : k === "⌫"
+                ? "text-muted-foreground bg-card border border-border hover:bg-white/5"
+                : "text-white bg-card border border-border hover:bg-white/5 hover:border-primary/40"
+            } ${disabled ? "opacity-50" : ""}`}
+          >
+            {k === "⌫" ? <Delete size={18} className="mx-auto" /> : k}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── PIN Confirmation Dialog ────────────────────────────────────────────── */
+function PinConfirmDialog({
+  onConfirm,
+  onClose,
+  onSkip,
+}: {
+  onConfirm: () => void;
+  onClose: () => void;
+  onSkip?: () => void;
+}) {
+  const { toast } = useToast();
+  const [pin, setPin] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (pin.length !== 4 || loading) return;
+    const t = setTimeout(() => { verifyAndConfirm(); }, 200);
+    return () => clearTimeout(t);
+  }, [pin]);
+
+  async function verifyAndConfirm() {
+    setLoading(true);
+    setError("");
+    try {
+      const resp = await fetch("/api/users/me/pin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setError(data.error ?? "Incorrect PIN.");
+        setPin("");
+        return;
+      }
+      onConfirm();
+    } catch {
+      setError("Network error. Please try again.");
+      setPin("");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-card border border-border rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm p-6 space-y-6 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Lock size={18} className="text-primary" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white">Confirm Transfer</h2>
+              <p className="text-xs text-muted-foreground">Enter your 4-digit transaction PIN</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3 text-xs text-destructive font-medium text-center flex items-center gap-2 justify-center">
+            <ShieldAlert size={14} />
+            {error}
+          </div>
+        )}
+
+        <PinKeypad value={pin} onChange={(v) => { setPin(v); setError(""); }} disabled={loading} />
+
+        {loading && (
+          <div className="flex justify-center">
+            <span className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          </div>
+        )}
+
+        {onSkip && (
+          <button type="button" onClick={onSkip} className="w-full text-xs text-muted-foreground hover:text-white text-center py-1 transition-colors">
+            Skip PIN (not recommended)
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Transfer Page ──────────────────────────────────────────────────────── */
 export function Transfer() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -44,8 +188,13 @@ export function Transfer() {
   const [newBenefBank, setNewBenefBank] = useState("");
   const [newBenefCurrency, setNewBenefCurrency] = useState("USD");
 
+  // PIN dialog state
+  const [pinDialogAction, setPinDialogAction] = useState<"send" | "topup" | null>(null);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
   const { data: accounts, isLoading: loadingAccounts } = useListAccounts({ query: { queryKey: getListAccountsQueryKey() } });
   const { data: beneficiaries, isLoading: loadingBeneficiaries } = useListBeneficiaries({ query: { queryKey: getListBeneficiariesQueryKey() } });
+  const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
 
   const sendMoney = useSendMoney();
   const topUp = useTopUpAccount();
@@ -53,6 +202,7 @@ export function Transfer() {
   const deleteBenef = useDeleteBeneficiary();
 
   const activeAccounts = accounts?.filter((a) => a.status === "active") ?? [];
+  const hasPin = me?.hasPin ?? false;
 
   useEffect(() => {
     if (activeAccounts.length === 1) {
@@ -70,7 +220,6 @@ export function Transfer() {
 
   const selectedAccount = activeAccounts.find((a) => a.id === parseInt(sendFrom));
 
-  // Currency symbol for selected account
   const currencySymbol = (() => {
     if (!selectedAccount) return "$";
     try {
@@ -82,15 +231,7 @@ export function Transfer() {
     }
   })();
 
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sendFrom) { toast({ title: "Select an account", description: "Choose an active account to send from.", variant: "destructive" }); return; }
-    if (!sendAmount || parseFloat(sendAmount) <= 0) { toast({ title: "Invalid amount", variant: "destructive" }); return; }
-    if (!sendRecipientAccount || !sendRecipientName) { toast({ title: "Recipient required", description: "Enter the recipient's name and account number.", variant: "destructive" }); return; }
-    if (selectedAccount && parseFloat(sendAmount) > selectedAccount.balance) {
-      toast({ title: "Insufficient funds", description: `Balance: ${selectedAccount.currency} ${selectedAccount.balance.toFixed(2)}`, variant: "destructive" });
-      return;
-    }
+  function executeSend() {
     sendMoney.mutate(
       { data: { fromAccountId: parseInt(sendFrom), amount: parseFloat(sendAmount), currency: selectedAccount?.currency ?? "USD", description: sendDescription || "Transfer", recipientAccount: sendRecipientAccount, recipientName: sendRecipientName } },
       {
@@ -103,12 +244,9 @@ export function Transfer() {
         onError: (err: any) => toast({ title: "Transfer failed", description: err?.data?.error ?? err?.message ?? "An error occurred.", variant: "destructive" }),
       },
     );
-  };
+  }
 
-  const handleTopUp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!topupAccount) { toast({ title: "Select an account", variant: "destructive" }); return; }
-    if (!topupAmount || parseFloat(topupAmount) <= 0) { toast({ title: "Invalid amount", variant: "destructive" }); return; }
+  function executeTopUp() {
     topUp.mutate(
       { data: { accountId: parseInt(topupAccount), amount: parseFloat(topupAmount), currency: topupCurrency } },
       {
@@ -121,6 +259,31 @@ export function Transfer() {
         onError: (err: any) => toast({ title: "Top up failed", description: err?.data?.error ?? err?.message ?? "An error occurred.", variant: "destructive" }),
       },
     );
+  }
+
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sendFrom) { toast({ title: "Select an account", description: "Choose an active account to send from.", variant: "destructive" }); return; }
+    if (!sendAmount || parseFloat(sendAmount) <= 0) { toast({ title: "Invalid amount", variant: "destructive" }); return; }
+    if (!sendRecipientAccount || !sendRecipientName) { toast({ title: "Recipient required", description: "Enter the recipient's name and account number.", variant: "destructive" }); return; }
+    if (selectedAccount && parseFloat(sendAmount) > selectedAccount.balance) {
+      toast({ title: "Insufficient funds", description: `Balance: ${selectedAccount.currency} ${selectedAccount.balance.toFixed(2)}`, variant: "destructive" });
+      return;
+    }
+    if (hasPin) {
+      setPinDialogAction("send");
+      setPendingAction(() => executeSend);
+    } else {
+      executeSend();
+    }
+  };
+
+  const handleTopUp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!topupAccount) { toast({ title: "Select an account", variant: "destructive" }); return; }
+    if (!topupAmount || parseFloat(topupAmount) <= 0) { toast({ title: "Invalid amount", variant: "destructive" }); return; }
+    // Top-up doesn't require PIN (it's adding funds, not sending)
+    executeTopUp();
   };
 
   const handleAddBeneficiary = (e: React.FormEvent) => {
@@ -178,6 +341,19 @@ export function Transfer() {
 
   return (
     <div className="flex flex-col pb-8">
+      {/* PIN Confirmation Dialog */}
+      {pinDialogAction && pendingAction && (
+        <PinConfirmDialog
+          onClose={() => { setPinDialogAction(null); setPendingAction(null); }}
+          onConfirm={() => {
+            setPinDialogAction(null);
+            const action = pendingAction;
+            setPendingAction(null);
+            action();
+          }}
+        />
+      )}
+
       {/* Tab Bar */}
       <div className="flex border-b border-border bg-card/50">
         {(["send", "topup"] as Tab[]).map((tab) => (
@@ -197,6 +373,22 @@ export function Transfer() {
         {/* ─── SEND TAB ─── */}
         {activeTab === "send" && (
           <div className="space-y-5">
+            {/* PIN status hint */}
+            {me && !hasPin && (
+              <button
+                type="button"
+                onClick={() => setLocation("/profile")}
+                className="w-full flex items-center gap-3 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-left"
+              >
+                <KeyRound size={16} className="text-amber-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-amber-300">No Transaction PIN set</p>
+                  <p className="text-[11px] text-amber-400/70 mt-0.5">Tap to set a PIN for enhanced transfer security.</p>
+                </div>
+                <span className="text-xs text-amber-400 font-medium shrink-0">Set PIN →</span>
+              </button>
+            )}
+
             {/* Quick Beneficiaries */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -357,10 +549,18 @@ export function Transfer() {
                 <Input value={sendDescription} onChange={(e) => setSendDescription(e.target.value)} placeholder="What's this for?" className="bg-card border-border h-12 rounded-xl" data-testid="input-send-note" />
               </div>
 
-              <Button type="submit" className="w-full h-14 rounded-xl mt-2 text-base font-semibold" disabled={sendMoney.isPending || activeAccounts.length === 0} data-testid="button-send-money">
+              <Button
+                type="submit"
+                className="w-full h-14 rounded-xl mt-2 text-base font-semibold"
+                disabled={sendMoney.isPending || activeAccounts.length === 0}
+                data-testid="button-send-money"
+              >
                 {sendMoney.isPending
                   ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing…</span>
-                  : <span className="flex items-center gap-2"><Send size={18} />Send Money</span>}
+                  : <span className="flex items-center gap-2">
+                      {hasPin ? <Lock size={16} /> : <Send size={18} />}
+                      {hasPin ? "Confirm with PIN" : "Send Money"}
+                    </span>}
               </Button>
             </form>
 
@@ -428,31 +628,39 @@ export function Transfer() {
               )}
             </div>
 
-            <div className="grid grid-cols-5 gap-3">
-              <div className="col-span-2 space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Currency</Label>
-                <Select value={topupCurrency} onValueChange={setTopupCurrency}>
-                  <SelectTrigger className="bg-card border-border h-12 rounded-xl font-semibold"><SelectValue /></SelectTrigger>
-                  <SelectContent>{CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-3 space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</Label>
-                <Input type="number" min="1" step="0.01" value={topupAmount} onChange={(e) => setTopupAmount(e.target.value)} placeholder="0.00" className="bg-card border-border h-12 rounded-xl text-lg font-bold text-right" data-testid="input-topup-amount" />
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Currency</Label>
+              <Select value={topupCurrency} onValueChange={setTopupCurrency}>
+                <SelectTrigger className="w-full bg-card border-border h-12 rounded-xl" data-testid="select-topup-currency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</Label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-muted-foreground pointer-events-none">$</span>
+                <Input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={topupAmount}
+                  onChange={(e) => setTopupAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="bg-card border-border h-16 rounded-xl pl-10 text-3xl font-bold"
+                  data-testid="input-topup-amount"
+                />
               </div>
             </div>
 
-            {topupAmount && parseFloat(topupAmount) > 0 && (
-              <div className="bg-card border border-border rounded-xl p-3.5 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">You will receive</span>
-                <span className="text-lg font-bold text-white">{topupCurrency} {parseFloat(topupAmount).toFixed(2)}</span>
-              </div>
-            )}
-
-            <Button type="submit" className="w-full h-14 rounded-xl text-base font-semibold" disabled={topUp.isPending || activeAccounts.length === 0} data-testid="button-topup">
+            <Button type="submit" className="w-full h-14 rounded-xl mt-2 text-base font-semibold" disabled={topUp.isPending || activeAccounts.length === 0} data-testid="button-topup">
               {topUp.isPending
                 ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing…</span>
-                : <span className="flex items-center gap-2"><ArrowDownToLine size={18} />Confirm Top Up</span>}
+                : <span className="flex items-center gap-2"><ArrowDownToLine size={18} />Top Up Account</span>}
             </Button>
           </form>
         )}

@@ -1,7 +1,7 @@
 import { useLocation, Link } from "wouter";
 import { useClerk, useUser } from "@clerk/react";
 import {
-  LayoutDashboard, Users, ArrowRightLeft, CreditCard, LogOut, Shield,
+  LayoutDashboard, Users, ArrowRightLeft, CreditCard, LogOut, Shield, MessageSquare,
 } from "lucide-react";
 
 const nav = [
@@ -9,6 +9,7 @@ const nav = [
   { href: "/users", label: "Users", icon: Users },
   { href: "/accounts", label: "Accounts", icon: CreditCard },
   { href: "/transactions", label: "Transactions", icon: ArrowRightLeft },
+  { href: "/sms", label: "SMS Gateway", icon: MessageSquare },
 ];
 
 export function Sidebar() {

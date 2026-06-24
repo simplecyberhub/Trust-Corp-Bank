@@ -202,4 +202,79 @@ router.post("/admin/notifications/broadcast", requireAdmin, async (req, res): Pr
   }
 });
 
+/* ─── SMS GATEWAY ADMIN ROUTES ───────────────────────────────────────────── */
+
+import { settingsTable, smsLogsTable } from "@workspace/db";
+import { getSmsConfig, saveSmsConfig, sendSms } from "../services/sms";
+import { desc as descOp } from "drizzle-orm";
+
+router.get("/admin/sms/config", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const config = await getSmsConfig();
+    res.json({
+      provider: config.provider,
+      apiKey: config.apiKey ? config.apiKey.slice(0, 4) + "••••••••" + config.apiKey.slice(-4) : "",
+      apiKeySet: !!config.apiKey,
+      senderId: config.senderId,
+      webhookUrl: config.webhookUrl ?? "",
+      enabled: config.enabled,
+    });
+  } catch (err) {
+    req.log.error({ err }, "getSmsConfig error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/admin/sms/config", requireAdmin, async (req, res): Promise<void> => {
+  const { provider, apiKey, senderId, webhookUrl, enabled } = req.body;
+  try {
+    await saveSmsConfig({
+      ...(provider !== undefined && { provider }),
+      ...(apiKey !== undefined && apiKey !== "" && { apiKey }),
+      ...(senderId !== undefined && { senderId }),
+      ...(webhookUrl !== undefined && { webhookUrl }),
+      ...(enabled !== undefined && { enabled: Boolean(enabled) }),
+    });
+    res.json({ success: true, message: "SMS configuration saved." });
+  } catch (err) {
+    req.log.error({ err }, "saveSmsConfig error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/admin/sms/test", requireAdmin, async (req, res): Promise<void> => {
+  const { phone } = req.body;
+  if (!phone || typeof phone !== "string") { res.status(400).json({ error: "phone is required" }); return; }
+  try {
+    const result = await sendSms(phone.trim(), `TrustCorp: This is a test SMS from your admin panel. Gateway is working correctly. Time: ${new Date().toUTCString()}`);
+    if (result.success) {
+      res.json({ success: true, message: `Test SMS sent to ${phone}.` });
+    } else {
+      res.status(400).json({ success: false, error: result.error ?? "Failed to send SMS." });
+    }
+  } catch (err) {
+    req.log.error({ err }, "sendTestSms error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/admin/sms/logs", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const limit = Math.min(Number(req.query.limit ?? 50), 200);
+    const offset = Number(req.query.offset ?? 0);
+    const logs = await db.select().from(smsLogsTable).orderBy(descOp(smsLogsTable.createdAt)).limit(limit).offset(offset);
+    const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(smsLogsTable);
+    res.json({
+      items: logs.map(l => ({
+        id: l.id, to: l.to, message: l.message, provider: l.provider,
+        status: l.status, error: l.error ?? null, createdAt: l.createdAt.toISOString(),
+      })),
+      total: Number(countRow?.count ?? 0), limit, offset,
+    });
+  } catch (err) {
+    req.log.error({ err }, "getSmsLogs error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

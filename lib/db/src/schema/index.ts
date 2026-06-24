@@ -5,3 +5,5 @@ export * from "./beneficiaries";
 export * from "./cards";
 export * from "./notifications";
 export * from "./otps";
+export * from "./settings";
+export * from "./sms-logs";

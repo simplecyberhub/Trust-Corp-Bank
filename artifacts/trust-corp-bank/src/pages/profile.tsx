@@ -10,9 +10,226 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import {
   User, ShieldCheck, LogOut, ChevronRight, Edit3, Check, X,
-  Phone, Mail, MapPin, Calendar, CreditCard, Lock,
+  Phone, Mail, MapPin, Calendar, CreditCard, Lock, KeyRound, Eye, EyeOff, Delete,
 } from "lucide-react";
 
+/* ─── PIN Keypad ─────────────────────────────────────────────────────────── */
+function PinKeypad({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
+  const append = (k: string) => {
+    if (k === "⌫") { onChange(value.slice(0, -1)); return; }
+    if (k === "" || value.length >= 4 || disabled) return;
+    onChange(value + k);
+  };
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-center gap-3">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${
+              value.length > i
+                ? "border-primary bg-primary/20"
+                : "border-border bg-card"
+            }`}
+          >
+            {value.length > i ? (
+              <div className="w-3 h-3 rounded-full bg-primary" />
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2.5 max-w-[240px] mx-auto">
+        {keys.map((k, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => append(k)}
+            disabled={disabled || k === ""}
+            className={`h-14 rounded-2xl text-xl font-semibold transition-all active:scale-95 select-none ${
+              k === ""
+                ? "invisible"
+                : k === "⌫"
+                ? "text-muted-foreground bg-card border border-border hover:bg-white/5"
+                : "text-white bg-card border border-border hover:bg-white/5 hover:border-primary/40"
+            } ${disabled ? "opacity-50" : ""}`}
+          >
+            {k === "⌫" ? <Delete size={18} className="mx-auto" /> : k}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── PIN Dialog ─────────────────────────────────────────────────────────── */
+type PinMode = "set" | "change-old" | "change-new" | "remove";
+
+function PinDialog({
+  mode,
+  onClose,
+  onSuccess,
+}: {
+  mode: "set" | "change" | "remove";
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [step, setStep] = useState<PinMode>(mode === "set" ? "set" : mode === "change" ? "change-old" : "remove");
+  const [pin, setPin] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [oldPin, setOldPin] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const reset = () => { setPin(""); setConfirm(""); setOldPin(""); setError(""); };
+
+  const title = {
+    set: "Set Transaction PIN",
+    "change-old": "Enter Current PIN",
+    "change-new": "Enter New PIN",
+    remove: "Confirm Removal",
+  }[step];
+
+  const subtitle = {
+    set: "Choose a 4-digit PIN to secure your transfers.",
+    "change-old": "Enter your current PIN to continue.",
+    "change-new": "Enter a new 4-digit PIN.",
+    remove: "Enter your PIN to remove it.",
+  }[step];
+
+  const currentEntry = step === "change-old" ? oldPin : step === "change-new" ? confirm : pin;
+  const setCurrentEntry = step === "change-old" ? setOldPin : step === "change-new" ? setConfirm : setPin;
+
+  useEffect(() => {
+    setError("");
+  }, [currentEntry]);
+
+  async function handleSubmit() {
+    if (currentEntry.length !== 4) return;
+    setLoading(true);
+    setError("");
+
+    try {
+      if (step === "set") {
+        if (!confirm) { setStep("change-new" as any); setPin(currentEntry); setConfirm(""); setLoading(false); return; }
+        // Actually for "set" mode, we show enter then confirm in two phases
+      }
+
+      if (mode === "set") {
+        if (!confirm) {
+          setStep("change-new" as any);
+          setOldPin(currentEntry);
+          setCurrentEntry("");
+          setLoading(false);
+          return;
+        }
+        if (currentEntry !== oldPin) { setError("PINs don't match. Try again."); setCurrentEntry(""); setLoading(false); return; }
+        const resp = await fetch("/api/users/me/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: oldPin }) });
+        const data = await resp.json();
+        if (!resp.ok) { setError(data.error ?? "Failed to set PIN."); setCurrentEntry(""); setLoading(false); return; }
+        toast({ title: "PIN set successfully" });
+        onSuccess();
+        return;
+      }
+
+      if (mode === "change") {
+        if (step === "change-old") {
+          setStep("change-new");
+          setOldPin(currentEntry);
+          setCurrentEntry("");
+          setLoading(false);
+          return;
+        }
+        if (step === "change-new") {
+          const resp = await fetch("/api/users/me/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: currentEntry, currentPin: oldPin }) });
+          const data = await resp.json();
+          if (!resp.ok) { setError(data.error ?? "Failed to change PIN."); setCurrentEntry(""); setLoading(false); return; }
+          toast({ title: "PIN changed successfully" });
+          onSuccess();
+          return;
+        }
+      }
+
+      if (mode === "remove") {
+        const resp = await fetch("/api/users/me/pin", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: currentEntry }) });
+        const data = await resp.json();
+        if (!resp.ok) { setError(data.error ?? "Failed to remove PIN."); setCurrentEntry(""); setLoading(false); return; }
+        toast({ title: "PIN removed" });
+        onSuccess();
+        return;
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // For "set" mode: first phase enters pin, second phase confirms
+  const isSetFirstPhase = mode === "set" && step === "set";
+  const isSetConfirmPhase = mode === "set" && (step as string) === "change-new";
+
+  const displayStep = isSetFirstPhase ? "Enter PIN" : isSetConfirmPhase ? "Confirm PIN" : title;
+  const displaySub = isSetFirstPhase ? "Choose a 4-digit PIN to secure your transfers." : isSetConfirmPhase ? "Re-enter your PIN to confirm." : subtitle;
+
+  const handleKeypadChange = (v: string) => {
+    setCurrentEntry(v);
+    setError("");
+  };
+
+  useEffect(() => {
+    if (currentEntry.length !== 4 || loading) return;
+    const timer = setTimeout(() => { handleSubmit(); }, 200);
+    return () => clearTimeout(timer);
+  }, [currentEntry]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-card border border-border rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm p-6 space-y-6 shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-white">{displayStep}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{displaySub}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3 text-xs text-destructive font-medium text-center">
+            {error}
+          </div>
+        )}
+
+        <PinKeypad value={currentEntry} onChange={handleKeypadChange} disabled={loading} />
+
+        {loading && (
+          <div className="flex justify-center">
+            <span className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          </div>
+        )}
+
+        <p className="text-xs text-muted-foreground text-center">
+          {mode === "set" ? "Your PIN protects all outgoing transfers." : mode === "remove" ? "Removing your PIN will disable transfer protection." : "Forgot PIN? Contact support."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Profile Page ───────────────────────────────────────────────────────── */
 export function Profile() {
   const { signOut } = useClerk();
   const { toast } = useToast();
@@ -23,6 +240,7 @@ export function Profile() {
 
   const [editingField, setEditingField] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState({ fullName: "", phone: "", address: "" });
+  const [pinDialog, setPinDialog] = useState<"set" | "change" | "remove" | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -124,8 +342,21 @@ export function Profile() {
     </div>
   );
 
+  const pinStatus = user?.hasPin;
+
   return (
     <div className="px-4 sm:px-6 py-4 pb-8 space-y-5">
+      {pinDialog && (
+        <PinDialog
+          mode={pinDialog}
+          onClose={() => setPinDialog(null)}
+          onSuccess={() => {
+            setPinDialog(null);
+            queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+          }}
+        />
+      )}
+
       <h1 className="text-2xl font-bold text-white tracking-tight">Profile</h1>
 
       {/* Avatar & Name Header */}
@@ -162,6 +393,60 @@ export function Profile() {
           <button onClick={() => setLocation("/kyc")} className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${badge.bg} ${badge.color}`} data-testid="button-verify-kyc">
             {user?.kycStatus === "submitted" ? "View Status" : "Verify Now"}
           </button>
+        )}
+      </div>
+
+      {/* Transaction PIN */}
+      <div className="bg-card rounded-2xl border border-border p-4">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Transaction PIN</h3>
+        <div className="flex items-center gap-3 py-1">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+            <KeyRound size={18} className="text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-white">
+              {isLoading ? <Skeleton className="h-4 w-28" /> : pinStatus ? "PIN Enabled" : "PIN Not Set"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {pinStatus ? "Required to confirm all outgoing transfers." : "Set a 4-digit PIN to protect your transfers."}
+            </p>
+          </div>
+          {!isLoading && (
+            <div className={`w-2 h-2 rounded-full shrink-0 ${pinStatus ? "bg-green-400" : "bg-orange-400"}`} />
+          )}
+        </div>
+
+        {!isLoading && (
+          <div className="flex gap-2 mt-4">
+            {!pinStatus ? (
+              <button
+                onClick={() => setPinDialog("set")}
+                className="flex-1 bg-primary text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5"
+                data-testid="button-set-pin"
+              >
+                <Lock size={15} />
+                Set PIN
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => setPinDialog("change")}
+                  className="flex-1 bg-card border border-border text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-white/5 transition-colors flex items-center justify-center gap-1.5"
+                  data-testid="button-change-pin"
+                >
+                  <Edit3 size={14} />
+                  Change PIN
+                </button>
+                <button
+                  onClick={() => setPinDialog("remove")}
+                  className="px-4 bg-destructive/10 border border-destructive/20 text-destructive text-sm font-semibold py-2.5 rounded-xl hover:bg-destructive/20 transition-colors"
+                  data-testid="button-remove-pin"
+                >
+                  Remove
+                </button>
+              </>
+            )}
+          </div>
         )}
       </div>
 
