@@ -8,6 +8,7 @@ import cardsRouter from "./cards";
 import notificationsRouter from "./notifications";
 import exchangeRouter from "./exchange";
 import adminRouter from "./admin";
+import otpRouter from "./otp";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(cardsRouter);
 router.use(notificationsRouter);
 router.use(exchangeRouter);
 router.use(adminRouter);
+router.use(otpRouter);
 
 export default router;
