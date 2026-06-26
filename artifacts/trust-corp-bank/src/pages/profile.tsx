@@ -119,20 +119,17 @@ function PinDialog({
     setError("");
 
     try {
-      if (step === "set") {
-        if (!confirm) { setStep("change-new" as any); setPin(currentEntry); setConfirm(""); setLoading(false); return; }
-        // Actually for "set" mode, we show enter then confirm in two phases
-      }
-
       if (mode === "set") {
-        if (!confirm) {
+        if (!oldPin) {
+          // First phase: store the entered PIN and move to confirm step
           setStep("change-new" as any);
           setOldPin(currentEntry);
-          setCurrentEntry("");
+          setPin("");
           setLoading(false);
           return;
         }
-        if (currentEntry !== oldPin) { setError("PINs don't match. Try again."); setCurrentEntry(""); setLoading(false); return; }
+        // Second phase: compare confirmation against the stored first entry
+        if (currentEntry !== oldPin) { setError("PINs don't match. Try again."); setConfirm(""); setLoading(false); return; }
         const resp = await fetch("/api/users/me/pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: oldPin }) });
         const data = await resp.json();
         if (!resp.ok) { setError(data.error ?? "Failed to set PIN."); setCurrentEntry(""); setLoading(false); return; }

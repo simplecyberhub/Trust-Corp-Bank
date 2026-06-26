@@ -46,6 +46,7 @@ export function Dashboard() {
   const queryClient = useQueryClient();
   const [broadcastTitle, setBroadcastTitle] = useState("");
   const [broadcastMsg, setBroadcastMsg] = useState("");
+  const [setupSecret, setSetupSecret] = useState("");
 
   const { data: me, isLoading: loadingMe } = useQuery({
     queryKey: ["admin-me"],
@@ -59,7 +60,7 @@ export function Dashboard() {
   });
 
   const setupAdmin = useMutation({
-    mutationFn: () => api.post<{ success: boolean; message: string }>("/admin/setup", {}),
+    mutationFn: () => api.post<{ success: boolean; message: string }>("/admin/setup", { secret: setupSecret }),
     onSuccess: (data) => {
       toast({ title: "Admin setup complete", description: data.message });
       queryClient.invalidateQueries({ queryKey: ["admin-me"] });
@@ -94,13 +95,20 @@ export function Dashboard() {
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center">
           <Shield size={40} className="text-blue-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Admin Setup Required</h2>
-          <p className="text-sm text-gray-400 mb-6">
-            You must first sign in to the main banking app at least once, then click below to claim admin access.
+          <p className="text-sm text-gray-400 mb-4">
+            Sign in to the main banking app first, then enter the setup secret below to claim admin access.
             Only one administrator is allowed.
           </p>
+          <input
+            type="password"
+            value={setupSecret}
+            onChange={(e) => setSetupSecret(e.target.value)}
+            placeholder="Enter admin setup secret…"
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500 mb-3 transition-colors"
+          />
           <Button
             onClick={() => setupAdmin.mutate()}
-            disabled={setupAdmin.isPending}
+            disabled={setupAdmin.isPending || !setupSecret.trim()}
             className="w-full bg-blue-600 hover:bg-blue-700"
           >
             {setupAdmin.isPending ? "Setting up…" : "Claim Admin Access"}
