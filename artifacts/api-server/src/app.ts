@@ -35,7 +35,20 @@ app.use(
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-app.use(cors({ credentials: true, origin: true }));
+// Restrict CORS to known trusted origins rather than reflecting any origin.
+// Allows Replit-hosted frontends (*.replit.app, *.replit.dev) and localhost for development.
+const TRUSTED_ORIGIN_RE = /^https?:\/\/(localhost(:\d+)?|[^/]+\.replit\.(app|dev))(\/.*)?$/;
+app.use(
+  cors({
+    credentials: true,
+    origin: (origin, callback) => {
+      // Same-origin or server-to-server requests have no Origin header — allow them.
+      if (!origin) return callback(null, true);
+      if (TRUSTED_ORIGIN_RE.test(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

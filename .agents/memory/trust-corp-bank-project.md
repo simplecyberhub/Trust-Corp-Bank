@@ -79,3 +79,10 @@ description: Hook signatures, Clerk setup, UX decisions, and API patterns for th
 
 - New tables export from `lib/db/src/schema/<name>.ts`, then add `export * from "./<name>"` in `lib/db/src/schema/index.ts`.
 - After schema changes: `pnpm --filter @workspace/db run push` then `pnpm run typecheck:libs`.
+
+## Security decisions
+
+- OTP verify brute-force: in-memory attempt map keyed `${userId}:${type}`, max 5 attempts, resets at OTP expiry. On lockout the OTP is invalidated in DB. No schema migration needed.
+- Admin bootstrap (`POST /admin/setup`): gated behind `ADMIN_SETUP_SECRET` env var (body must contain `{ secret }` matching it). Returns 503 if not set — effectively disabled by default.
+- CORS: narrowed from `origin: true` to regex allowing `*.replit.app`, `*.replit.dev`, and `localhost:*`. No-origin (same-origin/server) requests pass through.
+- Clerk proxy: both bank and admin frontends now read `VITE_CLERK_PROXY_URL` and pass it as `proxyUrl` to ClerkProvider for parity on custom-domain deployments.

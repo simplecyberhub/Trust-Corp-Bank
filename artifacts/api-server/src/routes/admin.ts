@@ -21,6 +21,18 @@ async function requireAdmin(req: any, res: any, next: any) {
 }
 
 router.post("/admin/setup", async (req, res): Promise<void> => {
+  // Require a server-side setup secret to prevent any authenticated user from self-promoting.
+  // Set ADMIN_SETUP_SECRET env var to a strong random value; share it only with the intended admin.
+  const setupSecret = process.env.ADMIN_SETUP_SECRET;
+  if (!setupSecret) {
+    res.status(503).json({ error: "Admin bootstrap is disabled. Set ADMIN_SETUP_SECRET to enable it." });
+    return;
+  }
+  if (req.body?.secret !== setupSecret) {
+    res.status(403).json({ error: "Invalid setup secret." });
+    return;
+  }
+
   const { userId: clerkId } = getAuth(req);
   if (!clerkId) { res.status(401).json({ error: "Unauthorized" }); return; }
   try {
