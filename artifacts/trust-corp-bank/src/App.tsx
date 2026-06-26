@@ -15,6 +15,7 @@ import { Profile } from "@/pages/profile";
 import { Exchange } from "@/pages/exchange";
 import { Notifications } from "@/pages/notifications";
 import { Kyc } from "@/pages/kyc";
+import { Support } from "@/pages/support";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ?? "";
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL as string | undefined;
@@ -193,6 +194,7 @@ function ClerkProviderWithRoutes() {
           <Route path="/exchange"><ProtectedRoute component={Exchange} /></Route>
           <Route path="/notifications"><ProtectedRoute component={Notifications} /></Route>
           <Route path="/kyc"><ProtectedRoute component={Kyc} /></Route>
+          <Route path="/support"><ProtectedRoute component={Support} /></Route>
 
           <Route><Redirect to="/" /></Route>
         </Switch>

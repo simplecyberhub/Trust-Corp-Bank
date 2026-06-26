@@ -9,6 +9,7 @@ import notificationsRouter from "./notifications";
 import exchangeRouter from "./exchange";
 import adminRouter from "./admin";
 import otpRouter from "./otp";
+import supportRouter from "./support";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(notificationsRouter);
 router.use(exchangeRouter);
 router.use(adminRouter);
 router.use(otpRouter);
+router.use(supportRouter);
 
 export default router;

@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, usersTable, accountsTable, transactionsTable, notificationsTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { db, usersTable, accountsTable, transactionsTable, notificationsTable, supportTicketsTable } from "@workspace/db";
+import { eq, desc, sql, and } from "drizzle-orm";
+import { randomBytes } from "crypto";
 
 const router = Router();
 
@@ -107,6 +108,11 @@ router.get("/admin/users", requireAdmin, async (req, res): Promise<void> => {
         id: u.id, clerkId: u.clerkId, email: u.email, fullName: u.fullName,
         kycStatus: u.kycStatus, role: u.role, phone: u.phone ?? null,
         phoneVerified: u.phoneVerified, hasPin: !!u.transactionPin,
+        transferRestricted: u.transferRestricted,
+        banned: u.banned,
+        bannedReason: u.bannedReason ?? null,
+        bannedAt: u.bannedAt?.toISOString() ?? null,
+        hardFrozen: u.hardFrozen,
         createdAt: u.createdAt.toISOString(),
       })),
       total: Number(countRow.count), limit, offset,
@@ -120,14 +126,36 @@ router.get("/admin/users", requireAdmin, async (req, res): Promise<void> => {
 router.patch("/admin/users/:id", requireAdmin, async (req, res): Promise<void> => {
   const id = Number(req.params.id);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { kycStatus, role } = req.body;
+  const { kycStatus, role, transferRestricted, banned, bannedReason, hardFrozen } = req.body;
   try {
     const updates: Record<string, unknown> = { updatedAt: new Date() };
-    if (kycStatus) updates.kycStatus = kycStatus;
-    if (role) updates.role = role;
+    if (kycStatus !== undefined) updates.kycStatus = kycStatus;
+    if (role !== undefined) updates.role = role;
+    if (transferRestricted !== undefined) updates.transferRestricted = Boolean(transferRestricted);
+    if (hardFrozen !== undefined) updates.hardFrozen = Boolean(hardFrozen);
+    if (banned !== undefined) {
+      updates.banned = Boolean(banned);
+      if (banned) {
+        updates.bannedAt = new Date();
+        updates.bannedReason = bannedReason ?? "Policy violation";
+        // Freeze all user accounts when banning
+        await db.update(accountsTable)
+          .set({ status: "frozen", updatedAt: new Date() })
+          .where(eq(accountsTable.userId, id));
+      } else {
+        updates.bannedAt = null;
+        updates.bannedReason = null;
+      }
+    }
     const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     if (!user) { res.status(404).json({ error: "Not found" }); return; }
-    res.json({ id: user.id, email: user.email, fullName: user.fullName, kycStatus: user.kycStatus, role: user.role });
+    res.json({
+      id: user.id, email: user.email, fullName: user.fullName,
+      kycStatus: user.kycStatus, role: user.role,
+      transferRestricted: user.transferRestricted,
+      banned: user.banned, bannedReason: user.bannedReason ?? null,
+      hardFrozen: user.hardFrozen,
+    });
   } catch (err) {
     req.log.error({ err }, "adminUpdateUser error");
     res.status(500).json({ error: "Internal server error" });
@@ -266,6 +294,246 @@ router.post("/admin/sms/test", requireAdmin, async (req, res): Promise<void> => 
     }
   } catch (err) {
     req.log.error({ err }, "sendTestSms error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/* ─── USER-SPECIFIC MANAGEMENT ROUTES ─────────────────────────────────────── */
+
+// Get a specific user's bank accounts (used by admin finance panel)
+router.get("/admin/users/:userId/accounts", requireAdmin, async (req, res): Promise<void> => {
+  const userId = Number(req.params.userId);
+  if (!userId) { res.status(400).json({ error: "Invalid id" }); return; }
+  try {
+    const accounts = await db.select().from(accountsTable)
+      .where(eq(accountsTable.userId, userId))
+      .orderBy(desc(accountsTable.createdAt));
+    res.json(accounts);
+  } catch (err) {
+    req.log.error({ err }, "adminGetUserAccounts error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Get Clerk metadata for a user (2FA status, email verification, login methods)
+router.get("/admin/users/:userId/clerk-info", requireAdmin, async (req, res): Promise<void> => {
+  const userId = Number(req.params.userId);
+  if (!userId) { res.status(400).json({ error: "Invalid id" }); return; }
+  try {
+    const [user] = await db.select({ clerkId: usersTable.clerkId })
+      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const clerkRes = await fetch(`https://api.clerk.com/v1/users/${user.clerkId}`, {
+      headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+    });
+    if (!clerkRes.ok) { res.status(502).json({ error: "Failed to fetch Clerk data" }); return; }
+
+    const data: any = await clerkRes.json();
+    const primaryEmail = (data.email_addresses ?? []).find(
+      (e: any) => e.id === data.primary_email_address_id
+    );
+    res.json({
+      twoFactorEnabled: data.two_factor_enabled ?? false,
+      emailVerified: primaryEmail?.verification?.status === "verified",
+      primaryEmail: primaryEmail?.email_address ?? null,
+      primaryEmailId: primaryEmail?.id ?? null,
+      externalAccounts: (data.external_accounts ?? []).map((a: any) => a.provider),
+      lastSignInAt: data.last_sign_in_at
+        ? new Date(data.last_sign_in_at).toISOString()
+        : null,
+    });
+  } catch (err) {
+    req.log.error({ err }, "adminClerkInfo error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Hard-freeze: freeze/unfreeze ALL accounts for a user at once
+router.post("/admin/users/:userId/hard-freeze", requireAdmin, async (req, res): Promise<void> => {
+  const userId = Number(req.params.userId);
+  if (!userId) { res.status(400).json({ error: "Invalid id" }); return; }
+  const freeze = req.body?.freeze !== false; // default true
+  try {
+    await db.update(usersTable)
+      .set({ hardFrozen: freeze, updatedAt: new Date() })
+      .where(eq(usersTable.id, userId));
+    await db.update(accountsTable)
+      .set({ status: freeze ? "frozen" : "active", updatedAt: new Date() })
+      .where(eq(accountsTable.userId, userId));
+    res.json({ success: true, hardFrozen: freeze });
+  } catch (err) {
+    req.log.error({ err }, "adminHardFreeze error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Credit a user's account
+router.post("/admin/users/:userId/credit", requireAdmin, async (req, res): Promise<void> => {
+  const userId = Number(req.params.userId);
+  if (!userId) { res.status(400).json({ error: "Invalid id" }); return; }
+  const { accountId, amount, description } = req.body;
+  if (!accountId || !amount || amount <= 0) {
+    res.status(400).json({ error: "accountId and a positive amount are required" }); return;
+  }
+  try {
+    const result = await db.transaction(async (trx) => {
+      const [account] = await trx.select().from(accountsTable)
+        .where(and(eq(accountsTable.id, Number(accountId)), eq(accountsTable.userId, userId)));
+      if (!account) throw Object.assign(new Error("Account not found"), { status: 404 });
+      const newBalance = account.balance + Number(amount);
+      await trx.update(accountsTable)
+        .set({ balance: newBalance, updatedAt: new Date() })
+        .where(eq(accountsTable.id, account.id));
+      const [tx] = await trx.insert(transactionsTable).values({
+        accountId: account.id,
+        type: "credit",
+        amount: Number(amount),
+        currency: account.currency,
+        status: "completed",
+        description: description ?? "Admin credit adjustment",
+        reference: "ADM" + randomBytes(5).toString("hex").toUpperCase(),
+        balanceAfter: newBalance,
+      }).returning();
+      return { tx, newBalance };
+    });
+    res.json({ success: true, transaction: result.tx, newBalance: result.newBalance });
+  } catch (err: any) {
+    if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
+    req.log.error({ err }, "adminCredit error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Debit a user's account
+router.post("/admin/users/:userId/debit", requireAdmin, async (req, res): Promise<void> => {
+  const userId = Number(req.params.userId);
+  if (!userId) { res.status(400).json({ error: "Invalid id" }); return; }
+  const { accountId, amount, description } = req.body;
+  if (!accountId || !amount || amount <= 0) {
+    res.status(400).json({ error: "accountId and a positive amount are required" }); return;
+  }
+  try {
+    const result = await db.transaction(async (trx) => {
+      const [account] = await trx.select().from(accountsTable)
+        .where(and(eq(accountsTable.id, Number(accountId)), eq(accountsTable.userId, userId)));
+      if (!account) throw Object.assign(new Error("Account not found"), { status: 404 });
+      if (account.balance < Number(amount)) throw Object.assign(new Error("Insufficient balance"), { status: 400 });
+      const newBalance = account.balance - Number(amount);
+      await trx.update(accountsTable)
+        .set({ balance: newBalance, updatedAt: new Date() })
+        .where(eq(accountsTable.id, account.id));
+      const [tx] = await trx.insert(transactionsTable).values({
+        accountId: account.id,
+        type: "debit",
+        amount: Number(amount),
+        currency: account.currency,
+        status: "completed",
+        description: description ?? "Admin debit adjustment",
+        reference: "ADM" + randomBytes(5).toString("hex").toUpperCase(),
+        balanceAfter: newBalance,
+      }).returning();
+      return { tx, newBalance };
+    });
+    res.json({ success: true, transaction: result.tx, newBalance: result.newBalance });
+  } catch (err: any) {
+    if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
+    if (err.status === 400) { res.status(400).json({ error: err.message }); return; }
+    req.log.error({ err }, "adminDebit error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Send a custom in-platform SMS to a user
+router.post("/admin/users/:userId/sms", requireAdmin, async (req, res): Promise<void> => {
+  const userId = Number(req.params.userId);
+  if (!userId) { res.status(400).json({ error: "Invalid id" }); return; }
+  const { message } = req.body;
+  if (!message || typeof message !== "string" || message.trim().length < 5) {
+    res.status(400).json({ error: "A message of at least 5 characters is required" }); return;
+  }
+  try {
+    const [user] = await db.select({ phone: usersTable.phone, fullName: usersTable.fullName })
+      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (!user.phone) { res.status(400).json({ error: "User has no phone number on file" }); return; }
+    const result = await sendSms(user.phone, message.trim());
+    if (!result.success) {
+      res.status(400).json({ success: false, error: result.error ?? "SMS delivery failed" }); return;
+    }
+    res.json({ success: true, message: `SMS sent to ${user.fullName} (${user.phone})` });
+  } catch (err) {
+    req.log.error({ err }, "adminSendSms error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/* ─── SUPPORT TICKET ADMIN ROUTES ─────────────────────────────────────────── */
+
+router.get("/admin/support-tickets", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const limit = Math.min(Number(req.query.limit ?? 50), 200);
+    const offset = Number(req.query.offset ?? 0);
+    const status = req.query.status as string | undefined;
+
+    const rows = await db.select({
+      id: supportTicketsTable.id,
+      userId: supportTicketsTable.userId,
+      subject: supportTicketsTable.subject,
+      message: supportTicketsTable.message,
+      status: supportTicketsTable.status,
+      priority: supportTicketsTable.priority,
+      adminReply: supportTicketsTable.adminReply,
+      adminUserId: supportTicketsTable.adminUserId,
+      createdAt: supportTicketsTable.createdAt,
+      updatedAt: supportTicketsTable.updatedAt,
+      userEmail: usersTable.email,
+      userFullName: usersTable.fullName,
+    })
+      .from(supportTicketsTable)
+      .leftJoin(usersTable, eq(supportTicketsTable.userId, usersTable.id))
+      .where(status ? eq(supportTicketsTable.status, status) : undefined)
+      .orderBy(desc(supportTicketsTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(supportTicketsTable)
+      .where(status ? eq(supportTicketsTable.status, status) : undefined);
+
+    res.json({
+      items: rows.map(r => ({
+        ...r,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+      })),
+      total: Number(countRow?.count ?? 0), limit, offset,
+    });
+  } catch (err) {
+    req.log.error({ err }, "adminListTickets error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+const VALID_TICKET_STATUSES = ["open", "in_progress", "resolved", "closed"] as const;
+
+router.patch("/admin/support-tickets/:id", requireAdmin, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+  const { status, adminReply } = req.body;
+  if (status && !VALID_TICKET_STATUSES.includes(status)) {
+    res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_TICKET_STATUSES.join(", ")}` }); return;
+  }
+  try {
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (status) updates.status = status;
+    if (adminReply !== undefined) updates.adminReply = adminReply;
+    if (adminReply) updates.adminUserId = (req as any).adminUser?.id;
+    const [ticket] = await db.update(supportTicketsTable).set(updates)
+      .where(eq(supportTicketsTable.id, id)).returning();
+    if (!ticket) { res.status(404).json({ error: "Ticket not found" }); return; }
+    res.json({ ...ticket, createdAt: ticket.createdAt.toISOString(), updatedAt: ticket.updatedAt.toISOString() });
+  } catch (err) {
+    req.log.error({ err }, "adminUpdateTicket error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -7,3 +7,4 @@ export * from "./notifications";
 export * from "./otps";
 export * from "./settings";
 export * from "./sms-logs";
+export * from "./support-tickets";

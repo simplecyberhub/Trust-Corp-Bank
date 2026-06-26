@@ -125,12 +125,30 @@ router.post("/transactions/send", async (req, res): Promise<void> => {
   try {
     const uid = await getUserId(clerkId);
     if (!uid) { res.status(404).json({ error: "User not found" }); return; }
+
+    // Enforce admin-set user restrictions before proceeding
+    const [userFlags] = await db.select({
+      banned: usersTable.banned,
+      transferRestricted: usersTable.transferRestricted,
+      hardFrozen: usersTable.hardFrozen,
+    }).from(usersTable).where(eq(usersTable.id, uid)).limit(1);
+    if (userFlags?.banned) {
+      res.status(403).json({ error: "Your account has been suspended. Please contact support." }); return;
+    }
+    if (userFlags?.hardFrozen) {
+      res.status(403).json({ error: "Your accounts are currently frozen. Please contact support." }); return;
+    }
+    if (userFlags?.transferRestricted) {
+      res.status(403).json({ error: "Transfers are restricted on your account. Please contact support." }); return;
+    }
+
     const { fromAccountId, amount, currency, description, recipientAccount, recipientName } = parse.data;
 
     const tx = await db.transaction(async (trx) => {
       const [account] = await trx.select().from(accountsTable)
         .where(and(eq(accountsTable.id, fromAccountId), eq(accountsTable.userId, uid)));
       if (!account) throw Object.assign(new Error("Account not found"), { status: 404 });
+      if (account.status === "frozen") throw Object.assign(new Error("This account is frozen"), { status: 403 });
       if (account.balance < amount) throw Object.assign(new Error("Insufficient funds"), { status: 400 });
 
       const newBalance = account.balance - amount;
@@ -185,6 +203,19 @@ router.post("/transactions/topup", async (req, res): Promise<void> => {
   try {
     const uid = await getUserId(clerkId);
     if (!uid) { res.status(404).json({ error: "User not found" }); return; }
+
+    // Enforce admin-set user restrictions
+    const [userFlags] = await db.select({
+      banned: usersTable.banned,
+      hardFrozen: usersTable.hardFrozen,
+    }).from(usersTable).where(eq(usersTable.id, uid)).limit(1);
+    if (userFlags?.banned) {
+      res.status(403).json({ error: "Your account has been suspended. Please contact support." }); return;
+    }
+    if (userFlags?.hardFrozen) {
+      res.status(403).json({ error: "Your accounts are currently frozen. Please contact support." }); return;
+    }
+
     const { accountId, amount, currency } = parse.data;
 
     const tx = await db.transaction(async (trx) => {

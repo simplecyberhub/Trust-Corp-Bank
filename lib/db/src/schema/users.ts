@@ -19,6 +19,12 @@ export const usersTable = pgTable("users", {
   pinAttempts: integer("pin_attempts").notNull().default(0),
   pinLockedUntil: timestamp("pin_locked_until", { withTimezone: true }),
   phoneVerified: boolean("phone_verified").notNull().default(false),
+  // Admin-managed restrictions
+  transferRestricted: boolean("transfer_restricted").notNull().default(false),
+  banned: boolean("banned").notNull().default(false),
+  bannedReason: text("banned_reason"),
+  bannedAt: timestamp("banned_at", { withTimezone: true }),
+  hardFrozen: boolean("hard_frozen").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

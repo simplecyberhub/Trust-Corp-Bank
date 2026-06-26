@@ -80,6 +80,34 @@ description: Hook signatures, Clerk setup, UX decisions, and API patterns for th
 - New tables export from `lib/db/src/schema/<name>.ts`, then add `export * from "./<name>"` in `lib/db/src/schema/index.ts`.
 - After schema changes: `pnpm --filter @workspace/db run push` then `pnpm run typecheck:libs`.
 
+## Admin user management features (fully implemented)
+
+- All user management actions live in `artifacts/admin/src/pages/users.tsx` as a Sheet drawer (click row → slide-over panel).
+- Actions: KYC approve/reject/revoke, transfer restriction toggle, ban/unban (with reason dialog), hard-freeze/unfreeze all accounts, credit/debit individual accounts, send SMS, view Clerk 2FA + email verified status.
+- New admin API endpoints in `routes/admin.ts`: `/admin/users/:id/accounts`, `/admin/users/:id/clerk-info`, `/admin/users/:id/hard-freeze`, `/admin/users/:id/credit`, `/admin/users/:id/debit`, `/admin/users/:id/sms`, `/admin/support-tickets` (GET + PATCH).
+- `useMutation` with object variable types: onSuccess callback must NOT re-annotate the variables param with a different type — let it infer from mutationFn to avoid TS2353.
+
+## Support tickets system
+
+- DB table: `support_tickets` — `id, userId, subject, message, status, priority, adminReply, adminUserId, createdAt, updatedAt`.
+- User routes (`routes/support.ts`): `POST /support-tickets`, `GET /support-tickets`. Manual validation (no zod) because esbuild in api-server cannot resolve `zod` or `zod/v4` directly.
+- Admin routes in `routes/admin.ts`: `GET /admin/support-tickets` (joined with users), `PATCH /admin/support-tickets/:id` (status + adminReply, validated against enum allowlist).
+- Bank frontend: `artifacts/trust-corp-bank/src/pages/support.tsx` — ticket list (collapsible) + new ticket form.
+- Admin frontend: `artifacts/admin/src/pages/support.tsx` — table with status filter tabs + dialog for viewing/replying.
+
+## esbuild resolution in api-server
+
+- `zod` and `zod/v4` CANNOT be resolved directly by the api-server's esbuild bundle. Use manual validation instead.
+- All other workspace packages (`@workspace/db`, etc.) bundle correctly.
+
+## Transfer restriction enforcement
+
+- `POST /transactions/send` and `POST /transactions/topup` now check `banned`, `hardFrozen`, and `transferRestricted` flags (for send only) before allowing the operation. Also checks `account.status === "frozen"` inside the DB transaction.
+
+## TSX generic arrow function gotcha
+
+- `async <T>(...)` in a `.tsx` file is parsed as JSX. Use a named function declaration instead: `async function call<T>(...)`. Trailing comma `<T,>` also works but is less readable.
+
 ## Security decisions
 
 - OTP verify brute-force: in-memory attempt map keyed `${userId}:${type}`, max 5 attempts, resets at OTP expiry. On lockout the OTP is invalidated in DB. No schema migration needed.
