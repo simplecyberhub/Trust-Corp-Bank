@@ -27,6 +27,7 @@ interface AdminUser {
   phone: string | null;
   phoneVerified: boolean;
   hasPin: boolean;
+  totpEnabled: boolean;
   transferRestricted: boolean;
   banned: boolean;
   bannedReason: string | null;
@@ -331,6 +332,12 @@ export function Users() {
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-gray-400">Phone</span><span className="text-white">{selectedUser.phone || "—"} {selectedUser.phoneVerified && <span className="text-green-400 text-xs ml-1">✓ Verified</span>}</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">PIN Set</span><span className="text-white">{selectedUser.hasPin ? "Yes" : "No"}</span></div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Security Token</span>
+                    <span className={selectedUser.totpEnabled ? "text-green-400 text-xs font-semibold" : "text-yellow-400 text-xs"}>
+                      {selectedUser.totpEnabled ? "✓ Authenticator Linked" : "Not Enabled"}
+                    </span>
+                  </div>
                   <div className="flex justify-between"><span className="text-gray-400">Joined</span><span className="text-white">{format(new Date(selectedUser.createdAt), "MMM d, yyyy")}</span></div>
                   {selectedUser.bannedAt && <div className="flex justify-between"><span className="text-gray-400">Banned At</span><span className="text-red-400 text-xs">{format(new Date(selectedUser.bannedAt), "MMM d, yyyy HH:mm")}</span></div>}
                   {selectedUser.bannedReason && <div className="flex justify-between"><span className="text-gray-400">Ban Reason</span><span className="text-red-300 text-xs">{selectedUser.bannedReason}</span></div>}

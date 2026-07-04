@@ -31,6 +31,7 @@ export const GetMeResponse = zod.object({
   "dateOfBirth": zod.string().nullish(),
   "role": zod.string(),
   "hasPin": zod.boolean(),
+  "totpEnabled": zod.boolean(),
   "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -59,6 +60,7 @@ export const UpdateMeResponse = zod.object({
   "dateOfBirth": zod.string().nullish(),
   "role": zod.string(),
   "hasPin": zod.boolean(),
+  "totpEnabled": zod.boolean(),
   "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -89,6 +91,7 @@ export const SubmitKycResponse = zod.object({
   "dateOfBirth": zod.string().nullish(),
   "role": zod.string(),
   "hasPin": zod.boolean(),
+  "totpEnabled": zod.boolean(),
   "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()

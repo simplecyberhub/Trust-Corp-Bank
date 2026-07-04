@@ -11,6 +11,7 @@ import {
 import { getUserId } from "./accounts";
 import { randomBytes } from "crypto";
 import { sendSms, formatSmsAlert } from "../services/sms";
+import { notifyAsync } from "../services/notifications";
 
 const router = Router();
 
@@ -174,7 +175,11 @@ router.post("/transactions/send", async (req, res): Promise<void> => {
 
     res.status(201).json(formatTx(tx));
 
-    // Fire SMS alert asynchronously after response is sent
+    // Fire SMS + in-app notification asynchronously after response is sent
+    const fmtBal = Number(tx.balanceAfter ?? 0).toFixed(2);
+    const fmtAmt = Number(amount).toFixed(2);
+    notifyAsync(uid, "Transfer Sent", `You sent ${currency} ${fmtAmt} to ${recipientName ?? recipientAccount ?? "recipient"}. Balance: ${currency} ${fmtBal}. Ref: ${tx.reference ?? ""}.`, "transaction");
+
     getUserPhone(clerkId).then((phone) => {
       if (phone) {
         sendSms(phone, formatSmsAlert("transfer", {
@@ -244,7 +249,11 @@ router.post("/transactions/topup", async (req, res): Promise<void> => {
 
     res.status(201).json(formatTx(tx));
 
-    // Fire SMS alert asynchronously
+    // Fire SMS + in-app notification asynchronously
+    const fmtBal2 = Number(tx.balanceAfter ?? 0).toFixed(2);
+    const fmtAmt2 = Number(amount).toFixed(2);
+    notifyAsync(uid, "Account Top Up", `Your account was credited ${currency} ${fmtAmt2}. New balance: ${currency} ${fmtBal2}. Ref: ${tx.reference ?? ""}.`, "transaction");
+
     getUserPhone(clerkId).then((phone) => {
       if (phone) {
         sendSms(phone, formatSmsAlert("topup", {

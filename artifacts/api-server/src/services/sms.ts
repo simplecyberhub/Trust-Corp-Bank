@@ -25,12 +25,23 @@ export async function getSmsConfig(): Promise<SmsConfig> {
     getSetting("sms.webhookUrl"),
     getSetting("sms.enabled"),
   ]);
+
+  // Auto-bootstrap from environment variables when the DB hasn't been configured yet.
+  // TERMII_API_KEY takes priority for Nigerian numbers; set sms.provider in admin to override.
+  const envTermiiKey = process.env.TERMII_API_KEY ?? "";
+  const effectiveProvider = (provider as SmsProvider) ?? (envTermiiKey ? "termii" : "textbelt");
+  const effectiveApiKey = apiKey || (effectiveProvider === "termii" ? envTermiiKey : "");
+  // Gateway is considered enabled if:
+  //   - explicitly set to "true" in DB, OR
+  //   - not configured in DB but TERMII_API_KEY is present in env
+  const effectiveEnabled = enabled === "true" || (!provider && !!envTermiiKey);
+
   return {
-    provider: (provider as SmsProvider) ?? "textbelt",
-    apiKey: apiKey ?? "",
+    provider: effectiveProvider,
+    apiKey: effectiveApiKey,
     senderId: senderId ?? "TrustCorp",
     webhookUrl: webhookUrl ?? undefined,
-    enabled: enabled === "true",
+    enabled: effectiveEnabled,
   };
 }
 

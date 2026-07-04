@@ -9,6 +9,8 @@ import {
   UpdateMeBody,
   SubmitKycBody,
 } from "@workspace/api-zod";
+import { generateTotpSecret, verifyTOTP, buildOtpAuthUrl, formatSecretForDisplay } from "../services/totp";
+import { notifyAsync } from "../services/notifications";
 
 const router = Router();
 const scryptAsync = promisify(scrypt);
@@ -284,6 +286,138 @@ router.delete("/users/me/pin", async (req, res): Promise<void> => {
   }
 });
 
+/* ─── TOTP / HARD TOKEN ROUTES ────────────────────────────────────────────── */
+
+/**
+ * POST /users/me/totp/setup
+ * Generates a new TOTP secret for the user (does NOT yet enable it).
+ * Returns the secret and otpauth URL so the user can add it to their authenticator app.
+ */
+router.post("/users/me/totp/setup", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (user.totpEnabled) {
+      res.status(400).json({ error: "Authenticator app is already enabled. Disable it first." });
+      return;
+    }
+    const secret = generateTotpSecret();
+    // Store the pending secret (not yet enabled)
+    await db.update(usersTable)
+      .set({ totpSecret: secret, totpEnabled: false, updatedAt: new Date() })
+      .where(eq(usersTable.clerkId, userId));
+
+    const otpAuthUrl = buildOtpAuthUrl(secret, user.email);
+    res.json({
+      secret,
+      secretFormatted: formatSecretForDisplay(secret),
+      otpAuthUrl,
+      email: user.email,
+    });
+  } catch (err) {
+    req.log.error({ err }, "totpSetup error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /users/me/totp/enable
+ * Verifies a 6-digit TOTP code and enables the authenticator.
+ * Body: { code: "123456" }
+ */
+router.post("/users/me/totp/enable", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { code } = req.body ?? {};
+  if (!code || typeof code !== "string") {
+    res.status(400).json({ error: "A 6-digit code from your authenticator app is required." }); return;
+  }
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (!user.totpSecret) {
+      res.status(400).json({ error: "No authenticator setup in progress. Call /users/me/totp/setup first." }); return;
+    }
+    if (user.totpEnabled) {
+      res.status(400).json({ error: "Authenticator app is already enabled." }); return;
+    }
+    if (!verifyTOTP(user.totpSecret, code.trim())) {
+      res.status(401).json({ error: "Incorrect code. Please try again." }); return;
+    }
+    await db.update(usersTable)
+      .set({ totpEnabled: true, updatedAt: new Date() })
+      .where(eq(usersTable.clerkId, userId));
+    notifyAsync(user.id, "Security Token Enabled", "An authenticator app has been linked to your account for extra security.", "security");
+    res.json({ success: true, message: "Authenticator app enabled successfully." });
+  } catch (err) {
+    req.log.error({ err }, "totpEnable error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * DELETE /users/me/totp
+ * Disables TOTP. Requires a valid current TOTP code.
+ * Body: { code: "123456" }
+ */
+router.delete("/users/me/totp", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { code } = req.body ?? {};
+  if (!code || typeof code !== "string") {
+    res.status(400).json({ error: "Your current 6-digit authenticator code is required to disable it." }); return;
+  }
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (!user.totpEnabled || !user.totpSecret) {
+      res.status(400).json({ error: "Authenticator app is not enabled." }); return;
+    }
+    if (!verifyTOTP(user.totpSecret, code.trim())) {
+      res.status(401).json({ error: "Incorrect code. Authenticator not disabled." }); return;
+    }
+    await db.update(usersTable)
+      .set({ totpSecret: null, totpEnabled: false, updatedAt: new Date() })
+      .where(eq(usersTable.clerkId, userId));
+    notifyAsync(user.id, "Security Token Disabled", "Your authenticator app has been removed from your account.", "security");
+    res.json({ success: true, message: "Authenticator app disabled." });
+  } catch (err) {
+    req.log.error({ err }, "totpDisable error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /users/me/totp/validate
+ * Validates a TOTP code without changing state (used for transaction confirmation etc.)
+ * Body: { code: "123456" }
+ */
+router.post("/users/me/totp/validate", async (req, res): Promise<void> => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { code } = req.body ?? {};
+  if (!code || typeof code !== "string") {
+    res.status(400).json({ error: "code is required" }); return;
+  }
+  try {
+    const [user] = await db.select({ totpSecret: usersTable.totpSecret, totpEnabled: usersTable.totpEnabled })
+      .from(usersTable).where(eq(usersTable.clerkId, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (!user.totpEnabled || !user.totpSecret) {
+      res.status(400).json({ error: "Authenticator app not enabled." }); return;
+    }
+    if (!verifyTOTP(user.totpSecret, code.trim())) {
+      res.status(401).json({ error: "Incorrect code." }); return;
+    }
+    res.json({ success: true, valid: true });
+  } catch (err) {
+    req.log.error({ err }, "totpValidate error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 /* ─── HELPERS ─────────────────────────────────────────────────────────────── */
 
 export function formatUser(user: typeof usersTable.$inferSelect) {
@@ -299,6 +433,7 @@ export function formatUser(user: typeof usersTable.$inferSelect) {
     dateOfBirth: user.dateOfBirth ?? null,
     role: user.role,
     hasPin: !!user.transactionPin,
+    totpEnabled: user.totpEnabled,
     phoneVerified: user.phoneVerified,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),

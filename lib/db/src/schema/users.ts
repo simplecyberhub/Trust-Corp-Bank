@@ -25,6 +25,9 @@ export const usersTable = pgTable("users", {
   bannedReason: text("banned_reason"),
   bannedAt: timestamp("banned_at", { withTimezone: true }),
   hardFrozen: boolean("hard_frozen").notNull().default(false),
+  // TOTP / Authenticator-app 2FA (hard token)
+  totpSecret: text("totp_secret"),
+  totpEnabled: boolean("totp_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

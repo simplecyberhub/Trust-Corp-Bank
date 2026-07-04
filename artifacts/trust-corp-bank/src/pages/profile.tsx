@@ -11,6 +11,7 @@ import { useLocation } from "wouter";
 import {
   User, ShieldCheck, LogOut, ChevronRight, Edit3, Check, X,
   Phone, Mail, MapPin, Calendar, CreditCard, Lock, KeyRound, Eye, EyeOff, Delete,
+  Fingerprint, Copy, CheckCircle2,
 } from "lucide-react";
 
 /* ─── PIN Keypad ─────────────────────────────────────────────────────────── */
@@ -226,6 +227,169 @@ function PinDialog({
   );
 }
 
+/* ─── TOTP Dialog ────────────────────────────────────────────────────────── */
+function TotpDialog({
+  mode,
+  onClose,
+  onSuccess,
+}: {
+  mode: "setup" | "disable";
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [step, setStep] = useState<"loading" | "show" | "verify">(mode === "setup" ? "loading" : "verify");
+  const [setupData, setSetupData] = useState<{ secret: string; secretFormatted: string; otpAuthUrl: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (mode !== "setup") return;
+    fetch("/api/users/me/totp/setup", { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) { setError(data.error); setStep("verify"); return; }
+        setSetupData(data);
+        setStep("show");
+      })
+      .catch(() => setError("Network error — please try again."));
+  }, []);
+
+  const handleCopy = () => {
+    if (setupData) {
+      navigator.clipboard.writeText(setupData.secretFormatted.replace(/\s/g, "")).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (code.length !== 6) return;
+    setLoading(true);
+    setError("");
+    try {
+      const resp = await fetch(
+        mode === "setup" ? "/api/users/me/totp/enable" : "/api/users/me/totp",
+        {
+          method: mode === "setup" ? "POST" : "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        },
+      );
+      const data = await resp.json();
+      if (!resp.ok) { setError(data.error ?? "Failed."); setLoading(false); return; }
+      toast({ title: mode === "setup" ? "Authenticator app enabled" : "Authenticator app disabled" });
+      onSuccess();
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-card border border-border rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm p-6 space-y-5 shadow-2xl max-h-[90dvh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-white">
+              {mode === "setup" ? "Enable Security Token" : "Disable Authenticator"}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {mode === "setup" ? "Link Google Authenticator or Authy." : "Enter your current 6-digit code to disable."}
+            </p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white">
+            <X size={16} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3 text-xs text-destructive font-medium text-center">
+            {error}
+          </div>
+        )}
+
+        {step === "loading" && (
+          <div className="flex justify-center py-8">
+            <span className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          </div>
+        )}
+
+        {step === "show" && setupData && (
+          <div className="space-y-4">
+            <div className="bg-background rounded-2xl p-4 border border-border space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Setup Instructions</p>
+              <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                <li>Open <strong className="text-white">Google Authenticator</strong> or <strong className="text-white">Authy</strong></li>
+                <li>Tap <strong className="text-white">+</strong> → "Enter a setup key"</li>
+                <li>Enter your email and the key below</li>
+                <li>Come back and enter the 6-digit code</li>
+              </ol>
+            </div>
+
+            <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4">
+              <p className="text-xs text-muted-foreground mb-2">Your Setup Key</p>
+              <p className="font-mono text-sm font-bold text-primary tracking-widest text-center break-all">
+                {setupData.secretFormatted}
+              </p>
+              <button
+                onClick={handleCopy}
+                className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+              >
+                {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                {copied ? "Copied!" : "Copy Key"}
+              </button>
+            </div>
+
+            <button
+              onClick={() => setStep("verify")}
+              className="w-full bg-primary text-white text-sm font-semibold py-3 rounded-xl hover:bg-primary/90 transition-colors"
+            >
+              I've Added It → Enter Code
+            </button>
+          </div>
+        )}
+
+        {step === "verify" && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-white font-medium text-center">Enter 6-digit code</p>
+              <p className="text-xs text-muted-foreground text-center">From your authenticator app</p>
+            </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              value={code}
+              onChange={(e) => { setCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setError(""); }}
+              placeholder="000000"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-center text-2xl font-mono font-bold text-white tracking-[0.5em] placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary transition-colors"
+              autoFocus
+            />
+            <button
+              onClick={handleVerify}
+              disabled={code.length !== 6 || loading}
+              className="w-full bg-primary text-white text-sm font-semibold py-3 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {loading ? "Verifying…" : mode === "setup" ? "Verify & Enable" : "Verify & Disable"}
+            </button>
+            {mode === "setup" && step === "verify" && (
+              <button onClick={() => setStep("show")} className="w-full text-xs text-muted-foreground hover:text-white transition-colors">
+                ← Back to setup key
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Profile Page ───────────────────────────────────────────────────────── */
 export function Profile() {
   const { signOut } = useClerk();
@@ -238,6 +402,7 @@ export function Profile() {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState({ fullName: "", phone: "", address: "" });
   const [pinDialog, setPinDialog] = useState<"set" | "change" | "remove" | null>(null);
+  const [totpDialog, setTotpDialog] = useState<"setup" | "disable" | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -353,6 +518,16 @@ export function Profile() {
           }}
         />
       )}
+      {totpDialog && (
+        <TotpDialog
+          mode={totpDialog}
+          onClose={() => setTotpDialog(null)}
+          onSuccess={() => {
+            setTotpDialog(null);
+            queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+          }}
+        />
+      )}
 
       <h1 className="text-2xl font-bold text-white tracking-tight">Profile</h1>
 
@@ -442,6 +617,55 @@ export function Profile() {
                   Remove
                 </button>
               </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Security Token (TOTP) */}
+      <div className="bg-card rounded-2xl border border-border p-4">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Security Token</h3>
+        <div className="flex items-center gap-3 py-1">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${
+            user?.totpEnabled
+              ? "bg-green-500/10 border-green-500/20"
+              : "bg-primary/10 border-primary/20"
+          }`}>
+            <Fingerprint size={18} className={user?.totpEnabled ? "text-green-400" : "text-primary"} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-white">
+              {isLoading ? <Skeleton className="h-4 w-36" /> : user?.totpEnabled ? "Authenticator Enabled" : "Authenticator App"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {user?.totpEnabled
+                ? "Google Authenticator is protecting your account."
+                : "Link an authenticator app for an extra security layer."}
+            </p>
+          </div>
+          {!isLoading && (
+            <div className={`w-2 h-2 rounded-full shrink-0 ${user?.totpEnabled ? "bg-green-400" : "bg-muted-foreground/30"}`} />
+          )}
+        </div>
+
+        {!isLoading && (
+          <div className="flex gap-2 mt-4">
+            {!user?.totpEnabled ? (
+              <button
+                onClick={() => setTotpDialog("setup")}
+                className="flex-1 bg-primary text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Fingerprint size={15} />
+                Enable Token
+              </button>
+            ) : (
+              <button
+                onClick={() => setTotpDialog("disable")}
+                className="flex-1 bg-destructive/10 border border-destructive/20 text-destructive text-sm font-semibold py-2.5 rounded-xl hover:bg-destructive/20 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <X size={14} />
+                Disable Token
+              </button>
             )}
           </div>
         )}

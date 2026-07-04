@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/express";
 import { db, usersTable, accountsTable, transactionsTable, notificationsTable, supportTicketsTable } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { randomBytes } from "crypto";
+import { notifyAsync } from "../services/notifications";
 
 const router = Router();
 
@@ -108,6 +109,7 @@ router.get("/admin/users", requireAdmin, async (req, res): Promise<void> => {
         id: u.id, clerkId: u.clerkId, email: u.email, fullName: u.fullName,
         kycStatus: u.kycStatus, role: u.role, phone: u.phone ?? null,
         phoneVerified: u.phoneVerified, hasPin: !!u.transactionPin,
+        totpEnabled: u.totpEnabled,
         transferRestricted: u.transferRestricted,
         banned: u.banned,
         bannedReason: u.bannedReason ?? null,
@@ -149,9 +151,20 @@ router.patch("/admin/users/:id", requireAdmin, async (req, res): Promise<void> =
     }
     const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     if (!user) { res.status(404).json({ error: "Not found" }); return; }
+    // Notify user of KYC status changes
+    if (kycStatus === "approved") {
+      notifyAsync(user.id, "KYC Approved ✓", "Your identity has been verified. You now have full access to Trust Corp Bank services.", "kyc");
+    } else if (kycStatus === "rejected") {
+      notifyAsync(user.id, "KYC Application Rejected", "Your identity verification was not approved. Please contact support for assistance.", "kyc");
+    }
+    // Notify on ban/unban
+    if (banned === false) {
+      notifyAsync(user.id, "Account Reinstated", "Your account has been reinstated. You may now use Trust Corp Bank services.", "security");
+    }
     res.json({
       id: user.id, email: user.email, fullName: user.fullName,
       kycStatus: user.kycStatus, role: user.role,
+      totpEnabled: user.totpEnabled,
       transferRestricted: user.transferRestricted,
       banned: user.banned, bannedReason: user.bannedReason ?? null,
       hardFrozen: user.hardFrozen,
@@ -361,6 +374,11 @@ router.post("/admin/users/:userId/hard-freeze", requireAdmin, async (req, res): 
     await db.update(accountsTable)
       .set({ status: freeze ? "frozen" : "active", updatedAt: new Date() })
       .where(eq(accountsTable.userId, userId));
+    if (freeze) {
+      notifyAsync(userId, "Accounts Frozen", "All your accounts have been frozen by Trust Corp. Please contact support immediately.", "security");
+    } else {
+      notifyAsync(userId, "Accounts Unfrozen", "Your accounts have been unfrozen and are now active again.", "security");
+    }
     res.json({ success: true, hardFrozen: freeze });
   } catch (err) {
     req.log.error({ err }, "adminHardFreeze error");
@@ -395,8 +413,9 @@ router.post("/admin/users/:userId/credit", requireAdmin, async (req, res): Promi
         reference: "ADM" + randomBytes(5).toString("hex").toUpperCase(),
         balanceAfter: newBalance,
       }).returning();
-      return { tx, newBalance };
+      return { tx, newBalance, currency: account.currency };
     });
+    notifyAsync(userId, "Account Credit", `${result.currency} ${Number(amount).toFixed(2)} has been credited to your account. New balance: ${result.currency} ${Number(result.newBalance).toFixed(2)}. Ref: ${result.tx.reference ?? ""}.`, "transaction");
     res.json({ success: true, transaction: result.tx, newBalance: result.newBalance });
   } catch (err: any) {
     if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
@@ -433,8 +452,9 @@ router.post("/admin/users/:userId/debit", requireAdmin, async (req, res): Promis
         reference: "ADM" + randomBytes(5).toString("hex").toUpperCase(),
         balanceAfter: newBalance,
       }).returning();
-      return { tx, newBalance };
+      return { tx, newBalance, currency: account.currency };
     });
+    notifyAsync(userId, "Account Debit", `${result.currency} ${Number(amount).toFixed(2)} has been debited from your account. Balance: ${result.currency} ${Number(result.newBalance).toFixed(2)}. Ref: ${result.tx.reference ?? ""}.`, "transaction");
     res.json({ success: true, transaction: result.tx, newBalance: result.newBalance });
   } catch (err: any) {
     if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
@@ -461,6 +481,8 @@ router.post("/admin/users/:userId/sms", requireAdmin, async (req, res): Promise<
     if (!result.success) {
       res.status(400).json({ success: false, error: result.error ?? "SMS delivery failed" }); return;
     }
+    // Also create an in-app notification for the message
+    notifyAsync(userId, "Message from Trust Corp", message.trim(), "system");
     res.json({ success: true, message: `SMS sent to ${user.fullName} (${user.phone})` });
   } catch (err) {
     req.log.error({ err }, "adminSendSms error");
