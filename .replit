@@ -34,8 +34,3 @@ externalPort = 3000
 [[ports]]
 localPort = 23744
 externalPort = 3001
-
-[userenv]
-
-[userenv.shared]
-ADMIN_SETUP_SECRET = "TC-Admin-2026-X9K4M7"
