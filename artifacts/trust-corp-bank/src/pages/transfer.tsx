@@ -297,9 +297,13 @@ export function Transfer() {
     if (!bankName) { toast({ title: "Bank name required", description: "Enter the recipient's bank name.", variant: "destructive" }); return; }
     if (transferType === "domestic") {
       if (!sendRecipientAccount) { toast({ title: "Account number required", variant: "destructive" }); return; }
+      if (!routingNumber) { toast({ title: "Routing number required", description: "Enter the 9-digit ABA routing number.", variant: "destructive" }); return; }
+      if (!/^\d{9}$/.test(routingNumber)) { toast({ title: "Invalid routing number", description: "Must be exactly 9 digits.", variant: "destructive" }); return; }
     } else {
       if (!swiftCode) { toast({ title: "SWIFT/BIC code required", description: "Required for international wire transfers.", variant: "destructive" }); return; }
+      if (!/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(swiftCode)) { toast({ title: "Invalid SWIFT/BIC", description: "Must be 8 or 11 alphanumeric characters.", variant: "destructive" }); return; }
       if (!iban && !sendRecipientAccount) { toast({ title: "Account/IBAN required", description: "Enter the recipient's IBAN or account number.", variant: "destructive" }); return; }
+      if (iban && !/^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/.test(iban)) { toast({ title: "Invalid IBAN", description: "IBAN must start with a 2-letter country code followed by digits.", variant: "destructive" }); return; }
       if (!bankCountry) { toast({ title: "Bank country required", variant: "destructive" }); return; }
     }
     if (selectedAccount && parseFloat(sendAmount) > selectedAccount.balance) {

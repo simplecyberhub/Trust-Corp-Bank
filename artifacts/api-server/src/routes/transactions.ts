@@ -145,13 +145,39 @@ router.post("/transactions/send", async (req, res): Promise<void> => {
     }
 
     const { fromAccountId, amount, currency, description, recipientAccount, recipientName } = parse.data;
-    // Extra bank-detail fields (not in Zod schema — read from raw body)
-    const bankName: string | null = typeof req.body.bankName === "string" ? req.body.bankName : null;
-    const bankCountry: string | null = typeof req.body.bankCountry === "string" ? req.body.bankCountry : null;
-    const transferType: string | null = typeof req.body.transferType === "string" ? req.body.transferType : null;
-    const routingNumber: string | null = typeof req.body.routingNumber === "string" ? req.body.routingNumber : null;
-    const swiftCode: string | null = typeof req.body.swiftCode === "string" ? req.body.swiftCode : null;
-    const iban: string | null = typeof req.body.iban === "string" ? req.body.iban : null;
+    // Extra bank-detail fields — validate and sanitize from raw body
+    const rawTransferType = typeof req.body.transferType === "string" ? req.body.transferType : "domestic";
+    const transferType: "domestic" | "international" =
+      rawTransferType === "international" ? "international" : "domestic";
+
+    const bankName: string | null = typeof req.body.bankName === "string" && req.body.bankName.trim()
+      ? req.body.bankName.trim().slice(0, 200) : null;
+    const bankCountry: string | null = typeof req.body.bankCountry === "string" && req.body.bankCountry.trim()
+      ? req.body.bankCountry.trim().slice(0, 100) : null;
+    const routingNumber: string | null = typeof req.body.routingNumber === "string"
+      ? (req.body.routingNumber.trim().slice(0, 9) || null) : null;
+    const rawSwift = typeof req.body.swiftCode === "string" ? req.body.swiftCode.trim().toUpperCase() : "";
+    const swiftCode: string | null = rawSwift || null;
+    const rawIban = typeof req.body.iban === "string" ? req.body.iban.trim().toUpperCase() : "";
+    const iban: string | null = rawIban || null;
+
+    // Server-side bank field validation
+    if (transferType === "domestic") {
+      if (!bankName) { res.status(400).json({ error: "Bank name is required." }); return; }
+      if (routingNumber && !/^\d{9}$/.test(routingNumber)) {
+        res.status(400).json({ error: "Routing number must be exactly 9 digits." }); return;
+      }
+    } else {
+      if (!bankName) { res.status(400).json({ error: "Bank name is required for international wire." }); return; }
+      if (!swiftCode) { res.status(400).json({ error: "SWIFT/BIC code is required for international wire." }); return; }
+      if (!/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(swiftCode)) {
+        res.status(400).json({ error: "Invalid SWIFT/BIC format." }); return;
+      }
+      if (iban && !/^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/.test(iban)) {
+        res.status(400).json({ error: "Invalid IBAN format." }); return;
+      }
+      if (!bankCountry) { res.status(400).json({ error: "Bank country is required for international wire." }); return; }
+    }
 
     const tx = await db.transaction(async (trx) => {
       const [account] = await trx.select().from(accountsTable)
