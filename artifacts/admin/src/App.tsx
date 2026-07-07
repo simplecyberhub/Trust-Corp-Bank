@@ -10,6 +10,9 @@ import { Transactions } from "@/pages/transactions";
 import { Accounts } from "@/pages/accounts";
 import { Sms } from "@/pages/sms";
 import { Support } from "@/pages/support";
+import { AuditLogs } from "@/pages/audit-logs";
+import { Reports } from "@/pages/reports";
+import { Email } from "@/pages/email";
 import { Sidebar } from "@/components/sidebar";
 
 const queryClient = new QueryClient({
@@ -150,8 +153,17 @@ function ClerkProviderWithRoutes() {
           <Route path="/sms">
             <AppLayout><ErrorBoundary><Sms /></ErrorBoundary></AppLayout>
           </Route>
+          <Route path="/email">
+            <AppLayout><ErrorBoundary><Email /></ErrorBoundary></AppLayout>
+          </Route>
           <Route path="/support">
             <AppLayout><ErrorBoundary><Support /></ErrorBoundary></AppLayout>
+          </Route>
+          <Route path="/audit-logs">
+            <AppLayout><ErrorBoundary><AuditLogs /></ErrorBoundary></AppLayout>
+          </Route>
+          <Route path="/reports">
+            <AppLayout><ErrorBoundary><Reports /></ErrorBoundary></AppLayout>
           </Route>
           <Route><Redirect to="/" /></Route>
         </Switch>

@@ -12,6 +12,7 @@ import { getUserId } from "./accounts";
 import { randomBytes } from "crypto";
 import { sendSms, formatSmsAlert } from "../services/sms";
 import { notifyAsync } from "../services/notifications";
+import { emailAsync } from "../services/email";
 
 const router = Router();
 
@@ -175,22 +176,33 @@ router.post("/transactions/send", async (req, res): Promise<void> => {
 
     res.status(201).json(formatTx(tx));
 
-    // Fire SMS + in-app notification asynchronously after response is sent
+    // Fire SMS + email + in-app notification asynchronously after response is sent
     const fmtBal = Number(tx.balanceAfter ?? 0).toFixed(2);
     const fmtAmt = Number(amount).toFixed(2);
-    notifyAsync(uid, "Transfer Sent", `You sent ${currency} ${fmtAmt} to ${recipientName ?? recipientAccount ?? "recipient"}. Balance: ${currency} ${fmtBal}. Ref: ${tx.reference ?? ""}.`, "transaction");
+    const recipientLabel = recipientName ?? recipientAccount ?? "recipient";
+    notifyAsync(uid, "Transfer Sent", `You sent ${currency} ${fmtAmt} to ${recipientLabel}. Balance: ${currency} ${fmtBal}. Ref: ${tx.reference ?? ""}.`, "transaction");
 
-    getUserPhone(clerkId).then((phone) => {
-      if (phone) {
-        sendSms(phone, formatSmsAlert("transfer", {
-          currency,
-          amount,
-          recipient: recipientName ?? recipientAccount ?? "recipient",
-          ref: tx.reference ?? "",
-          balance: tx.balanceAfter ?? 0,
-        })).catch(() => {});
-      }
-    }).catch(() => {});
+    // Fetch user contact info once for both SMS and email
+    db.select({ email: usersTable.email, phone: usersTable.phone })
+      .from(usersTable).where(eq(usersTable.id, uid)).limit(1)
+      .then(([u]) => {
+        if (u?.phone) {
+          sendSms(u.phone, formatSmsAlert("transfer", {
+            currency, amount, recipient: recipientLabel,
+            ref: tx.reference ?? "", balance: tx.balanceAfter ?? 0,
+          })).catch(() => {});
+        }
+        if (u?.email) {
+          emailAsync(
+            u.email,
+            `Transfer Sent — ${currency} ${fmtAmt}`,
+            "Transfer Sent",
+            `You sent <strong>${currency} ${fmtAmt}</strong> to <strong>${recipientLabel}</strong>.<br>New balance: ${currency} ${fmtBal}.`,
+            tx.reference ?? undefined,
+            "transfer",
+          );
+        }
+      }).catch(() => {});
 
   } catch (err: any) {
     if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
@@ -249,21 +261,30 @@ router.post("/transactions/topup", async (req, res): Promise<void> => {
 
     res.status(201).json(formatTx(tx));
 
-    // Fire SMS + in-app notification asynchronously
+    // Fire SMS + email + in-app notification asynchronously
     const fmtBal2 = Number(tx.balanceAfter ?? 0).toFixed(2);
     const fmtAmt2 = Number(amount).toFixed(2);
     notifyAsync(uid, "Account Top Up", `Your account was credited ${currency} ${fmtAmt2}. New balance: ${currency} ${fmtBal2}. Ref: ${tx.reference ?? ""}.`, "transaction");
 
-    getUserPhone(clerkId).then((phone) => {
-      if (phone) {
-        sendSms(phone, formatSmsAlert("topup", {
-          currency,
-          amount,
-          ref: tx.reference ?? "",
-          balance: tx.balanceAfter ?? 0,
-        })).catch(() => {});
-      }
-    }).catch(() => {});
+    db.select({ email: usersTable.email, phone: usersTable.phone })
+      .from(usersTable).where(eq(usersTable.id, uid)).limit(1)
+      .then(([u]) => {
+        if (u?.phone) {
+          sendSms(u.phone, formatSmsAlert("topup", {
+            currency, amount, ref: tx.reference ?? "", balance: tx.balanceAfter ?? 0,
+          })).catch(() => {});
+        }
+        if (u?.email) {
+          emailAsync(
+            u.email,
+            `Account Credited — ${currency} ${fmtAmt2}`,
+            "Account Top Up",
+            `Your account has been credited <strong>${currency} ${fmtAmt2}</strong>.<br>New balance: ${currency} ${fmtBal2}.`,
+            tx.reference ?? undefined,
+            "topup",
+          );
+        }
+      }).catch(() => {});
 
   } catch (err: any) {
     if (err.status === 404) { res.status(404).json({ error: err.message }); return; }

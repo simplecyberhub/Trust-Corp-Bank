@@ -392,7 +392,7 @@ function TotpDialog({
 
 /* ─── Profile Page ───────────────────────────────────────────────────────── */
 export function Profile() {
-  const { signOut } = useClerk();
+  const { signOut, openUserProfile } = useClerk();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -675,7 +675,25 @@ export function Profile() {
       <div className="bg-card rounded-2xl border border-border p-4">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Personal Information</h3>
         <EditableRow icon={User} label="Full Name" fieldKey="fullName" value={user?.fullName} />
-        <ReadOnlyRow icon={Mail} label="Email Address" value={user?.email} />
+        {/* Email — managed via Clerk; opens Clerk's profile modal for changes */}
+        <div className="flex items-start gap-3 py-4 border-t border-border/50">
+          <div className="w-8 h-8 rounded-lg bg-background flex items-center justify-center shrink-0 mt-0.5">
+            <Mail size={15} className="text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground mb-1">Email Address</p>
+            <p className="text-sm text-white font-medium truncate">{user?.email || "—"}</p>
+            <p className="text-[10px] text-muted-foreground/50 mt-0.5">Tap ✎ to update via your account settings</p>
+          </div>
+          <button
+            onClick={() => openUserProfile()}
+            className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-white hover:bg-white/10 transition-colors mt-0.5"
+            title="Update email address"
+            data-testid="button-update-email"
+          >
+            <Edit3 size={14} />
+          </button>
+        </div>
         <EditableRow icon={Phone} label="Phone Number" fieldKey="phone" value={user?.phone} />
         <EditableRow icon={MapPin} label="Address" fieldKey="address" value={user?.address} />
         <div className="flex items-start gap-3 py-4 border-t border-border/50">

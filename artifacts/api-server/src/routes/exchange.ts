@@ -1,10 +1,13 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, accountsTable, transactionsTable } from "@workspace/db";
+import { db, accountsTable, transactionsTable, usersTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { GetExchangeRatesQueryParams, ConvertCurrencyBody } from "@workspace/api-zod";
 import { getUserId } from "./accounts";
 import { randomBytes } from "crypto";
+import { notifyAsync } from "../services/notifications";
+import { emailAsync } from "../services/email";
+import { sendSms, formatSmsAlert } from "../services/sms";
 
 const router = Router();
 
@@ -85,10 +88,21 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
     const toAmount = (amount - fee) * rate;
 
     let transactionId: number | null = null;
+    let executedRef: string | null = null;
+    let executedUid: number | null = null;
+    let userEmail: string | null = null;
+    let userPhone: string | null = null;
 
     if (execute && fromAccountId && toAccountId) {
       const uid = await getUserId(clerkId);
       if (!uid) { res.status(404).json({ error: "User not found" }); return; }
+      executedUid = uid;
+
+      // Fetch user contact info for notifications
+      const [userRow] = await db.select({ email: usersTable.email, phone: usersTable.phone })
+        .from(usersTable).where(eq(usersTable.id, uid)).limit(1);
+      userEmail = userRow?.email ?? null;
+      userPhone = userRow?.phone ?? null;
 
       const result = await db.transaction(async (trx) => {
         const [fromAcc] = await trx.select().from(accountsTable)
@@ -101,6 +115,7 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
         if (!toAcc) throw Object.assign(new Error("Destination account not found"), { status: 404 });
 
         const ref = "TCB" + randomBytes(6).toString("hex").toUpperCase();
+        executedRef = ref;
         const fromNewBalance = fromAcc.balance - amount;
         const toNewBalance = toAcc.balance + toAmount;
 
@@ -112,7 +127,6 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
           .set({ balance: toNewBalance, updatedAt: new Date() })
           .where(eq(accountsTable.id, toAccountId));
 
-        // Debit transaction on source account
         const [debitTx] = await trx.insert(transactionsTable).values({
           accountId: fromAccountId,
           type: "exchange",
@@ -124,7 +138,6 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
           balanceAfter: fromNewBalance,
         }).returning();
 
-        // Credit transaction on destination account
         await trx.insert(transactionsTable).values({
           accountId: toAccountId,
           type: "exchange",
@@ -152,6 +165,37 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
       timestamp: Math.floor(Date.now() / 1000),
       transactionId,
     });
+
+    // Fire notifications after response is sent
+    if (execute && executedUid && executedRef) {
+      const fmtFrom = Number(amount).toFixed(2);
+      const fmtTo = Number(toAmount).toFixed(2);
+      const notifMsg = `Exchanged ${fromCurrency} ${fmtFrom} → ${toCurrency} ${fmtTo}. Fee: ${fromCurrency} ${Number(fee).toFixed(2)}. Ref: ${executedRef}.`;
+
+      notifyAsync(executedUid, "Currency Exchange Completed", notifMsg, "transaction");
+
+      if (userEmail) {
+        emailAsync(
+          userEmail,
+          `Currency Exchange — ${fromCurrency} → ${toCurrency}`,
+          "Currency Exchange Completed",
+          `You exchanged <strong>${fromCurrency} ${fmtFrom}</strong> to <strong>${toCurrency} ${fmtTo}</strong>.<br>Exchange fee: ${fromCurrency} ${Number(fee).toFixed(2)} (0.5%).`,
+          executedRef,
+          "exchange",
+        );
+      }
+
+      if (userPhone) {
+        sendSms(userPhone, formatSmsAlert("exchange" as any, {
+          currency: fromCurrency,
+          amount,
+          ref: executedRef,
+          balance: 0,
+          recipient: `${toCurrency} ${fmtTo}`,
+        })).catch(() => {});
+      }
+    }
+
   } catch (err: any) {
     if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
     if (err.status === 400) { res.status(400).json({ error: err.message }); return; }

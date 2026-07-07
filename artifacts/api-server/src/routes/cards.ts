@@ -5,6 +5,9 @@ import { eq, and } from "drizzle-orm";
 import { CreateCardBody, GetCardParams, UpdateCardParams, UpdateCardBody } from "@workspace/api-zod";
 import { getUserId } from "./accounts";
 import { randomInt } from "crypto";
+import { notifyAsync } from "../services/notifications";
+import { emailAsync } from "../services/email";
+import { sendSms } from "../services/sms";
 
 const router = Router();
 
@@ -35,7 +38,8 @@ router.post("/cards", async (req, res): Promise<void> => {
       .where(and(eq(accountsTable.id, parse.data.accountId), eq(accountsTable.userId, uid)));
     if (!account) { res.status(404).json({ error: "Account not found" }); return; }
 
-    const [userRow] = await db.select({ fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, uid)).limit(1);
+    const [userRow] = await db.select({ fullName: usersTable.fullName, email: usersTable.email, phone: usersTable.phone })
+      .from(usersTable).where(eq(usersTable.id, uid)).limit(1);
     const holderName = userRow?.fullName ?? "Card Holder";
 
     const now = new Date();
@@ -55,6 +59,24 @@ router.post("/cards", async (req, res): Promise<void> => {
     }).returning();
 
     res.status(201).json(formatCard(card));
+
+    // Notify user about new card
+    const cardLabel = `${parse.data.cardType === "virtual" ? "Virtual" : "Physical"} ${(parse.data.network ?? "Visa").toUpperCase()} card ending ••${card.last4}`;
+    notifyAsync(uid, "New Card Issued", `Your ${cardLabel} has been issued and is ready to use.`, "security");
+    if (userRow?.email) {
+      emailAsync(
+        userRow.email,
+        "New Card Issued — Trust Corp Bank",
+        "Your New Card is Ready",
+        `A new <strong>${cardLabel}</strong> has been issued to your account.<br>Expires: ${expiry.getMonth() + 1}/${expiry.getFullYear()}`,
+        undefined,
+        "card",
+      );
+    }
+    if (userRow?.phone) {
+      sendSms(userRow.phone, `TrustCorp: New card issued — ${cardLabel}. Expires ${expiry.getMonth() + 1}/${expiry.getFullYear()}. If you did not request this, contact support immediately.`).catch(() => {});
+    }
+
   } catch (err) {
     req.log.error({ err }, "createCard error");
     res.status(500).json({ error: "Internal server error" });
@@ -98,6 +120,23 @@ router.patch("/cards/:cardId", async (req, res): Promise<void> => {
       .returning();
     if (!card) { res.status(404).json({ error: "Not found" }); return; }
     res.json(formatCard(card));
+
+    // Notify on freeze/unfreeze
+    if (bodyParse.data.status === "frozen") {
+      notifyAsync(uid, "Card Frozen", `Your card ending ••${card.last4} has been frozen. No transactions will be processed.`, "security");
+      // Fetch user contact for SMS/email
+      db.select({ email: usersTable.email, phone: usersTable.phone }).from(usersTable).where(eq(usersTable.id, uid)).limit(1).then(([u]) => {
+        if (u?.phone) sendSms(u.phone, `TrustCorp: Your card ending ••${card.last4} has been FROZEN. Contact support if this was unexpected.`).catch(() => {});
+        if (u?.email) emailAsync(u.email, "Card Frozen — Trust Corp Bank", "Card Frozen", `Your card ending <strong>••${card.last4}</strong> has been frozen. No transactions will be processed until you unfreeze it.`, undefined, "card");
+      }).catch(() => {});
+    } else if (bodyParse.data.status === "active") {
+      notifyAsync(uid, "Card Unfrozen", `Your card ending ••${card.last4} is now active and ready to use.`, "security");
+      db.select({ email: usersTable.email, phone: usersTable.phone }).from(usersTable).where(eq(usersTable.id, uid)).limit(1).then(([u]) => {
+        if (u?.phone) sendSms(u.phone, `TrustCorp: Your card ending ••${card.last4} has been unfrozen and is now active.`).catch(() => {});
+        if (u?.email) emailAsync(u.email, "Card Unfrozen — Trust Corp Bank", "Card Now Active", `Your card ending <strong>••${card.last4}</strong> has been unfrozen and is ready to use.`, undefined, "card");
+      }).catch(() => {});
+    }
+
   } catch (err) {
     req.log.error({ err }, "updateCard error");
     res.status(500).json({ error: "Internal server error" });

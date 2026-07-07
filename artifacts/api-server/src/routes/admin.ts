@@ -1,9 +1,22 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, usersTable, accountsTable, transactionsTable, notificationsTable, supportTicketsTable } from "@workspace/db";
+import { db, usersTable, accountsTable, transactionsTable, notificationsTable, supportTicketsTable, auditLogsTable } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { notifyAsync } from "../services/notifications";
+import { getEmailConfig, saveEmailConfig, sendTestEmail } from "../services/email";
+
+/** Fire-and-forget audit log entry. */
+function logAudit(
+  adminId: number,
+  adminEmail: string,
+  action: string,
+  targetUserId?: number | null,
+  targetEmail?: string | null,
+  details?: string | null,
+): void {
+  db.insert(auditLogsTable).values({ adminId, adminEmail, action, targetUserId, targetEmail, details }).catch(() => {});
+}
 
 const router = Router();
 
@@ -151,16 +164,26 @@ router.patch("/admin/users/:id", requireAdmin, async (req, res): Promise<void> =
     }
     const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
     if (!user) { res.status(404).json({ error: "Not found" }); return; }
-    // Notify user of KYC status changes
+    const adminUser = (req as any).adminUser;
+    // Notify + audit KYC status changes
     if (kycStatus === "approved") {
       notifyAsync(user.id, "KYC Approved ✓", "Your identity has been verified. You now have full access to Trust Corp Bank services.", "kyc");
+      logAudit(adminUser.id, adminUser.email, "kyc_approved", user.id, user.email, `KYC approved for ${user.fullName}`);
     } else if (kycStatus === "rejected") {
       notifyAsync(user.id, "KYC Application Rejected", "Your identity verification was not approved. Please contact support for assistance.", "kyc");
+      logAudit(adminUser.id, adminUser.email, "kyc_rejected", user.id, user.email, `KYC rejected for ${user.fullName}`);
+    } else if (kycStatus === "pending") {
+      logAudit(adminUser.id, adminUser.email, "kyc_revoked", user.id, user.email, `KYC status revoked for ${user.fullName}`);
     }
-    // Notify on ban/unban
-    if (banned === false) {
+    // Notify + audit on ban/unban
+    if (banned === true) {
+      logAudit(adminUser.id, adminUser.email, "user_banned", user.id, user.email, `Banned: ${bannedReason ?? "Policy violation"}`);
+    } else if (banned === false) {
       notifyAsync(user.id, "Account Reinstated", "Your account has been reinstated. You may now use Trust Corp Bank services.", "security");
+      logAudit(adminUser.id, adminUser.email, "user_unbanned", user.id, user.email, `Account reinstated for ${user.fullName}`);
     }
+    if (transferRestricted === true) logAudit(adminUser.id, adminUser.email, "transfer_restricted", user.id, user.email);
+    if (transferRestricted === false) logAudit(adminUser.id, adminUser.email, "transfer_unrestricted", user.id, user.email);
     res.json({
       id: user.id, email: user.email, fullName: user.fullName,
       kycStatus: user.kycStatus, role: user.role,
@@ -575,6 +598,80 @@ router.get("/admin/sms/logs", requireAdmin, async (req, res): Promise<void> => {
     });
   } catch (err) {
     req.log.error({ err }, "getSmsLogs error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/* ─── EMAIL NOTIFICATION ADMIN ROUTES ─────────────────────────────────────── */
+
+router.get("/admin/email/config", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const config = await getEmailConfig();
+    res.json({
+      provider: config.provider,
+      apiKey: config.apiKey ? config.apiKey.slice(0, 6) + "••••••••" : "",
+      apiKeySet: !!config.apiKey,
+      fromAddress: config.fromAddress,
+      enabled: config.enabled,
+    });
+  } catch (err) {
+    req.log.error({ err }, "getEmailConfig error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/admin/email/config", requireAdmin, async (req, res): Promise<void> => {
+  const { provider, apiKey, fromAddress, enabled } = req.body;
+  try {
+    await saveEmailConfig({
+      ...(provider !== undefined && { provider }),
+      ...(apiKey !== undefined && apiKey !== "" && { apiKey }),
+      ...(fromAddress !== undefined && { fromAddress }),
+      ...(enabled !== undefined && { enabled: Boolean(enabled) }),
+    });
+    res.json({ success: true, message: "Email configuration saved." });
+  } catch (err) {
+    req.log.error({ err }, "saveEmailConfig error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/admin/email/test", requireAdmin, async (req, res): Promise<void> => {
+  const { to } = req.body;
+  if (!to || typeof to !== "string") { res.status(400).json({ error: "to (email address) is required" }); return; }
+  try {
+    const result = await sendTestEmail(to.trim());
+    if (result.success) {
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ success: false, error: result.error ?? "Send failed" });
+    }
+  } catch (err) {
+    req.log.error({ err }, "testEmail error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/* ─── AUDIT LOG ROUTES ─────────────────────────────────────────────────────── */
+
+router.get("/admin/audit-logs", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const limit = Math.min(Number(req.query.limit ?? 50), 200);
+    const offset = Number(req.query.offset ?? 0);
+    const logs = await db.select().from(auditLogsTable)
+      .orderBy(descOp(auditLogsTable.createdAt)).limit(limit).offset(offset);
+    const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(auditLogsTable);
+    res.json({
+      items: logs.map(l => ({
+        id: l.id, adminId: l.adminId, adminEmail: l.adminEmail,
+        action: l.action, targetUserId: l.targetUserId ?? null,
+        targetEmail: l.targetEmail ?? null, details: l.details ?? null,
+        ipAddress: l.ipAddress ?? null, createdAt: l.createdAt.toISOString(),
+      })),
+      total: Number(countRow?.count ?? 0), limit, offset,
+    });
+  } catch (err) {
+    req.log.error({ err }, "getAuditLogs error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

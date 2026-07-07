@@ -1,7 +1,8 @@
 import { useLocation, Link } from "wouter";
 import { useClerk, useUser } from "@clerk/react";
 import {
-  LayoutDashboard, Users, ArrowRightLeft, CreditCard, LogOut, Shield, MessageSquare, LifeBuoy,
+  LayoutDashboard, Users, ArrowRightLeft, CreditCard, LogOut, Shield,
+  MessageSquare, LifeBuoy, ClipboardList, BarChart3, Mail,
 } from "lucide-react";
 
 const nav = [
@@ -9,8 +10,12 @@ const nav = [
   { href: "/users", label: "Users", icon: Users },
   { href: "/accounts", label: "Accounts", icon: CreditCard },
   { href: "/transactions", label: "Transactions", icon: ArrowRightLeft },
+  { href: "/reports", label: "Reports & Exports", icon: BarChart3 },
+  { divider: true },
   { href: "/sms", label: "SMS Gateway", icon: MessageSquare },
+  { href: "/email", label: "Email Notifications", icon: Mail },
   { href: "/support", label: "Support Tickets", icon: LifeBuoy },
+  { href: "/audit-logs", label: "Audit Log", icon: ClipboardList },
 ];
 
 export function Sidebar() {
@@ -34,8 +39,12 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 space-y-1">
-        {nav.map(({ href, label, icon: Icon }) => {
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+        {nav.map((item, idx) => {
+          if ("divider" in item) {
+            return <div key={idx} className="my-2 border-t border-gray-800/70" />;
+          }
+          const { href, label, icon: Icon } = item as { href: string; label: string; icon: React.ElementType };
           const active = href === "/" ? location === "/" : location.startsWith(href);
           return (
             <Link
