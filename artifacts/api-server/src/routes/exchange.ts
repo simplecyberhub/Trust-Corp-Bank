@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db, accountsTable, transactionsTable, usersTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { GetExchangeRatesQueryParams, ConvertCurrencyBody } from "@workspace/api-zod";
 import { getUserId } from "./accounts";
 import { randomBytes } from "crypto";
@@ -98,16 +98,28 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
       if (!uid) { res.status(404).json({ error: "User not found" }); return; }
       executedUid = uid;
 
-      // Fetch user contact info for notifications
-      const [userRow] = await db.select({ email: usersTable.email, phone: usersTable.phone })
-        .from(usersTable).where(eq(usersTable.id, uid)).limit(1);
-      userEmail = userRow?.email ?? null;
-      userPhone = userRow?.phone ?? null;
+      // Fetch user contact info + restriction flags
+      const [userRow] = await db.select({
+        email: usersTable.email,
+        phone: usersTable.phone,
+        banned: usersTable.banned,
+        hardFrozen: usersTable.hardFrozen,
+        transferRestricted: usersTable.transferRestricted,
+      }).from(usersTable).where(eq(usersTable.id, uid)).limit(1);
+
+      if (!userRow) { res.status(404).json({ error: "User not found" }); return; }
+      if (userRow.banned) { res.status(403).json({ error: "Your account has been suspended." }); return; }
+      if (userRow.hardFrozen) { res.status(403).json({ error: "Your accounts are currently frozen. Contact support." }); return; }
+      if (userRow.transferRestricted) { res.status(403).json({ error: "Transfers and exchanges are restricted on your account." }); return; }
+
+      userEmail = userRow.email ?? null;
+      userPhone = userRow.phone ?? null;
 
       const result = await db.transaction(async (trx) => {
         const [fromAcc] = await trx.select().from(accountsTable)
           .where(and(eq(accountsTable.id, fromAccountId), eq(accountsTable.userId, uid)));
         if (!fromAcc) throw Object.assign(new Error("Source account not found"), { status: 404 });
+        if (fromAcc.status === "frozen") throw Object.assign(new Error("Source account is frozen."), { status: 403 });
         if (fromAcc.balance < amount) throw Object.assign(new Error("Insufficient funds"), { status: 400 });
 
         const [toAcc] = await trx.select().from(accountsTable)
@@ -186,12 +198,12 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
       }
 
       if (userPhone) {
-        sendSms(userPhone, formatSmsAlert("exchange" as any, {
-          currency: fromCurrency,
-          amount,
+        sendSms(userPhone, formatSmsAlert("exchange", {
+          fromCurrency,
+          fromAmount: amount,
+          toCurrency,
+          toAmount,
           ref: executedRef,
-          balance: 0,
-          recipient: `${toCurrency} ${fmtTo}`,
         })).catch(() => {});
       }
     }
@@ -199,6 +211,7 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
   } catch (err: any) {
     if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
     if (err.status === 400) { res.status(400).json({ error: err.message }); return; }
+    if (err.status === 403) { res.status(403).json({ error: err.message }); return; }
     req.log.error({ err }, "convertCurrency error");
     res.status(500).json({ error: "Internal server error" });
   }

@@ -17,20 +17,32 @@ export function Email() {
   const queryClient = useQueryClient();
 
   const [showKey, setShowKey] = useState(false);
+  const [keyTouched, setKeyTouched] = useState(false);
   const [testTo, setTestTo] = useState("");
   const [form, setForm] = useState<EmailConfig | null>(null);
 
   const { isLoading } = useQuery({
     queryKey: ["email-config"],
     queryFn: async () => {
-      const config = await api.get<EmailConfig>("/admin/email/config");
-      setForm(config);
+      const config = await api.get<EmailConfig & { apiKeySet: boolean }>("/admin/email/config");
+      // Store placeholder text instead of the masked value so we never re-save a masked key
+      setForm({ ...config, apiKey: "" });
+      setKeyTouched(false);
       return config;
     },
   });
 
   const saveMutation = useMutation({
-    mutationFn: (config: EmailConfig) => api.post("/admin/email/config", config),
+    mutationFn: (config: EmailConfig) => {
+      const payload: Record<string, unknown> = {
+        provider: config.provider,
+        fromAddress: config.fromAddress,
+        enabled: config.enabled,
+      };
+      // Only include apiKey when the admin actually typed a new one
+      if (keyTouched && config.apiKey.trim()) payload.apiKey = config.apiKey.trim();
+      return api.post("/admin/email/config", payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["email-config"] });
       toast({ title: "Email config saved", description: "Settings updated successfully." });

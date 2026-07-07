@@ -240,12 +240,21 @@ router.patch("/admin/accounts/:id", requireAdmin, async (req, res): Promise<void
   }
 });
 
+const VALID_TX_TYPES = new Set(["transfer", "topup", "exchange", "credit", "debit", "card", "fee"]);
+
 router.get("/admin/transactions", requireAdmin, async (req, res): Promise<void> => {
   try {
     const limit = Math.min(Number(req.query.limit ?? 50), 200);
     const offset = Number(req.query.offset ?? 0);
-    const txs = await db.select().from(transactionsTable).orderBy(desc(transactionsTable.createdAt)).limit(limit).offset(offset);
-    const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(transactionsTable);
+    const typeFilter = typeof req.query.type === "string" && VALID_TX_TYPES.has(req.query.type)
+      ? req.query.type
+      : null;
+    const whereClause = typeFilter ? eq(transactionsTable.type, typeFilter as any) : undefined;
+    const txs = await db.select().from(transactionsTable)
+      .where(whereClause)
+      .orderBy(desc(transactionsTable.createdAt)).limit(limit).offset(offset);
+    const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(transactionsTable)
+      .where(whereClause);
     res.json({
       items: txs.map(t => ({
         id: t.id, accountId: t.accountId, type: t.type, amount: t.amount,
