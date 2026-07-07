@@ -176,6 +176,13 @@ export function Transfer() {
   const [sendDescription, setSendDescription] = useState("");
   const [sendRecipientAccount, setSendRecipientAccount] = useState("");
   const [sendRecipientName, setSendRecipientName] = useState("");
+  // Bank detail fields
+  const [transferType, setTransferType] = useState<"domestic" | "international">("domestic");
+  const [bankName, setBankName] = useState("");
+  const [bankCountry, setBankCountry] = useState("");
+  const [routingNumber, setRoutingNumber] = useState("");
+  const [swiftCode, setSwiftCode] = useState("");
+  const [iban, setIban] = useState("");
   const [selectedBeneficiary, setSelectedBeneficiary] = useState<number | null>(null);
 
   const [topupAccount, setTopupAccount] = useState("");
@@ -211,12 +218,17 @@ export function Transfer() {
     }
   }, [activeAccounts.length]);
 
-  const handlePickBeneficiary = (ben: { id: number; name: string; accountNumber: string }) => {
+  const handlePickBeneficiary = (ben: { id: number; name: string; accountNumber: string; bankName?: string }) => {
     setSelectedBeneficiary(ben.id);
     setSendRecipientName(ben.name);
     setSendRecipientAccount(ben.accountNumber);
+    if (ben.bankName) setBankName(ben.bankName);
   };
-  const clearBeneficiary = () => { setSelectedBeneficiary(null); setSendRecipientName(""); setSendRecipientAccount(""); };
+  const clearBeneficiary = () => {
+    setSelectedBeneficiary(null);
+    setSendRecipientName(""); setSendRecipientAccount("");
+    setBankName(""); setBankCountry(""); setRoutingNumber(""); setSwiftCode(""); setIban("");
+  };
 
   const selectedAccount = activeAccounts.find((a) => a.id === parseInt(sendFrom));
 
@@ -233,7 +245,23 @@ export function Transfer() {
 
   function executeSend() {
     sendMoney.mutate(
-      { data: { fromAccountId: parseInt(sendFrom), amount: parseFloat(sendAmount), currency: selectedAccount?.currency ?? "USD", description: sendDescription || "Transfer", recipientAccount: sendRecipientAccount, recipientName: sendRecipientName } },
+      {
+        data: {
+          fromAccountId: parseInt(sendFrom),
+          amount: parseFloat(sendAmount),
+          currency: selectedAccount?.currency ?? "USD",
+          description: sendDescription || "Transfer",
+          recipientAccount: transferType === "international" && iban ? iban : sendRecipientAccount,
+          recipientName: sendRecipientName,
+          // Extra bank fields (pass-through — backend reads from raw body)
+          ...(bankName && { bankName }),
+          ...(bankCountry && { bankCountry }),
+          ...(transferType && { transferType }),
+          ...(routingNumber && { routingNumber }),
+          ...(swiftCode && { swiftCode }),
+          ...(iban && { iban }),
+        } as any,
+      },
       {
         onSuccess: () => {
           toast({ title: "Transfer sent", description: `${selectedAccount?.currency} ${parseFloat(sendAmount).toFixed(2)} sent to ${sendRecipientName}.` });
@@ -265,7 +293,15 @@ export function Transfer() {
     e.preventDefault();
     if (!sendFrom) { toast({ title: "Select an account", description: "Choose an active account to send from.", variant: "destructive" }); return; }
     if (!sendAmount || parseFloat(sendAmount) <= 0) { toast({ title: "Invalid amount", variant: "destructive" }); return; }
-    if (!sendRecipientAccount || !sendRecipientName) { toast({ title: "Recipient required", description: "Enter the recipient's name and account number.", variant: "destructive" }); return; }
+    if (!sendRecipientName) { toast({ title: "Recipient name required", description: "Enter the recipient's full legal name.", variant: "destructive" }); return; }
+    if (!bankName) { toast({ title: "Bank name required", description: "Enter the recipient's bank name.", variant: "destructive" }); return; }
+    if (transferType === "domestic") {
+      if (!sendRecipientAccount) { toast({ title: "Account number required", variant: "destructive" }); return; }
+    } else {
+      if (!swiftCode) { toast({ title: "SWIFT/BIC code required", description: "Required for international wire transfers.", variant: "destructive" }); return; }
+      if (!iban && !sendRecipientAccount) { toast({ title: "Account/IBAN required", description: "Enter the recipient's IBAN or account number.", variant: "destructive" }); return; }
+      if (!bankCountry) { toast({ title: "Bank country required", variant: "destructive" }); return; }
+    }
     if (selectedAccount && parseFloat(sendAmount) > selectedAccount.balance) {
       toast({ title: "Insufficient funds", description: `Balance: ${selectedAccount.currency} ${selectedAccount.balance.toFixed(2)}`, variant: "destructive" });
       return;
@@ -485,6 +521,27 @@ export function Transfer() {
                 )}
               </div>
 
+              {/* Transfer type toggle */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Transfer Type</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["domestic", "international"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTransferType(t)}
+                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+                        transferType === t
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {t === "domestic" ? "🏦 Domestic" : "🌍 International"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {selectedBeneficiary ? (
                 <div className="bg-primary/10 border border-primary/20 rounded-xl p-3.5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -493,21 +550,60 @@ export function Transfer() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-white">{sendRecipientName}</p>
-                      <p className="text-xs text-muted-foreground font-mono">····{sendRecipientAccount.slice(-4)}</p>
+                      <p className="text-xs text-muted-foreground">{bankName || "Saved recipient"}</p>
                     </div>
                   </div>
                   <button type="button" onClick={clearBeneficiary} className="text-muted-foreground hover:text-white p-1" data-testid="button-clear-beneficiary"><X size={16} /></button>
                 </div>
               ) : (
                 <div className="space-y-3">
+                  {/* Recipient Name */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recipient Name</Label>
-                    <Input value={sendRecipientName} onChange={(e) => setSendRecipientName(e.target.value)} placeholder="Full legal name" className="bg-card border-border h-12 rounded-xl" data-testid="input-recipient-name" />
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recipient Full Name</Label>
+                    <Input value={sendRecipientName} onChange={(e) => setSendRecipientName(e.target.value)} placeholder="Full legal name as on bank account" className="bg-card border-border h-12 rounded-xl" data-testid="input-recipient-name" />
                   </div>
+
+                  {/* Bank Name */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Account Number</Label>
-                    <Input value={sendRecipientAccount} onChange={(e) => setSendRecipientAccount(e.target.value)} placeholder="Enter account number" className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" data-testid="input-recipient-account" />
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Bank Name</Label>
+                    <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. Chase Bank, Wells Fargo, Barclays" className="bg-card border-border h-12 rounded-xl" />
                   </div>
+
+                  {transferType === "domestic" ? (
+                    <>
+                      {/* Account Number */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Account Number</Label>
+                        <Input value={sendRecipientAccount} onChange={(e) => setSendRecipientAccount(e.target.value)} placeholder="Recipient account number" className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" data-testid="input-recipient-account" />
+                      </div>
+                      {/* Routing Number */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Routing Number <span className="text-muted-foreground normal-case font-normal">(ABA/ACH)</span></Label>
+                        <Input value={routingNumber} onChange={(e) => setRoutingNumber(e.target.value)} placeholder="9-digit routing number" maxLength={9} className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* SWIFT/BIC */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SWIFT / BIC Code</Label>
+                        <Input value={swiftCode} onChange={(e) => setSwiftCode(e.target.value.toUpperCase())} placeholder="e.g. CHASUS33, BARCGB22" maxLength={11} className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" />
+                      </div>
+                      {/* IBAN */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">IBAN <span className="text-muted-foreground normal-case font-normal">(or account number)</span></Label>
+                        <Input value={iban} onChange={(e) => setIban(e.target.value.toUpperCase())} placeholder="e.g. GB29NWBK60161331926819" className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" />
+                        {!iban && (
+                          <Input value={sendRecipientAccount} onChange={(e) => setSendRecipientAccount(e.target.value)} placeholder="Or enter account number" className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" data-testid="input-recipient-account" />
+                        )}
+                      </div>
+                      {/* Bank Country */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Bank Country</Label>
+                        <Input value={bankCountry} onChange={(e) => setBankCountry(e.target.value)} placeholder="e.g. United Kingdom, Germany, Nigeria" className="bg-card border-border h-12 rounded-xl" />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 

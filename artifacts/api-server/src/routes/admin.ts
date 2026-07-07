@@ -650,11 +650,8 @@ router.post("/admin/email/test", requireAdmin, async (req, res): Promise<void> =
   if (!to || typeof to !== "string") { res.status(400).json({ error: "to (email address) is required" }); return; }
   try {
     const result = await sendTestEmail(to.trim());
-    if (result.success) {
-      res.json({ success: true });
-    } else {
-      res.status(400).json({ success: false, error: result.error ?? "Send failed" });
-    }
+    // Always 200 so the client can read the error message
+    res.json({ success: result.success, error: result.error ?? null });
   } catch (err) {
     req.log.error({ err }, "testEmail error");
     res.status(500).json({ error: "Internal server error" });

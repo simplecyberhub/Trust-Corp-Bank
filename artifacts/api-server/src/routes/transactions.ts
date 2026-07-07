@@ -145,6 +145,13 @@ router.post("/transactions/send", async (req, res): Promise<void> => {
     }
 
     const { fromAccountId, amount, currency, description, recipientAccount, recipientName } = parse.data;
+    // Extra bank-detail fields (not in Zod schema — read from raw body)
+    const bankName: string | null = typeof req.body.bankName === "string" ? req.body.bankName : null;
+    const bankCountry: string | null = typeof req.body.bankCountry === "string" ? req.body.bankCountry : null;
+    const transferType: string | null = typeof req.body.transferType === "string" ? req.body.transferType : null;
+    const routingNumber: string | null = typeof req.body.routingNumber === "string" ? req.body.routingNumber : null;
+    const swiftCode: string | null = typeof req.body.swiftCode === "string" ? req.body.swiftCode : null;
+    const iban: string | null = typeof req.body.iban === "string" ? req.body.iban : null;
 
     const tx = await db.transaction(async (trx) => {
       const [account] = await trx.select().from(accountsTable)
@@ -169,6 +176,12 @@ router.post("/transactions/send", async (req, res): Promise<void> => {
         recipientName: recipientName ?? null,
         recipientAccount: recipientAccount ?? null,
         balanceAfter: newBalance,
+        bankName,
+        bankCountry,
+        transferType,
+        routingNumber,
+        swiftCode,
+        iban,
       }).returning();
 
       return inserted;

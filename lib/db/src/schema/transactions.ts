@@ -15,6 +15,13 @@ export const transactionsTable = pgTable("transactions", {
   recipientAccount: text("recipient_account"),
   senderName: text("sender_name"),
   balanceAfter: doublePrecision("balance_after"),
+  // Bank transfer details
+  bankName: text("bank_name"),
+  bankCountry: text("bank_country"),
+  transferType: text("transfer_type"), // "domestic" | "international"
+  routingNumber: text("routing_number"),
+  swiftCode: text("swift_code"),
+  iban: text("iban"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

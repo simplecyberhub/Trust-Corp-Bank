@@ -1,8 +1,8 @@
 /**
  * Email notification service.
- * Configurable via admin settings (email.provider, email.apiKey, email.fromAddress, email.enabled).
+ * Priority: RESEND_API_KEY env var → DB settings table.
  * Currently supports Resend (https://resend.com) — just a fetch call, no extra package needed.
- * All sends are fire-and-forget; errors are swallowed and logged.
+ * All async sends are fire-and-forget; errors are swallowed and logged.
  */
 import { db, settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -23,6 +23,18 @@ async function getSetting(key: string): Promise<string | null> {
 }
 
 export async function getEmailConfig(): Promise<EmailConfig> {
+  // Env-var takes priority — no DB round-trip needed when it's set
+  const envApiKey = process.env.RESEND_API_KEY;
+  if (envApiKey) {
+    const fromAddress = await getSetting("email.fromAddress");
+    return {
+      provider: "resend",
+      apiKey: envApiKey,
+      fromAddress: fromAddress ?? "onboarding@resend.dev",
+      enabled: true,
+    };
+  }
+
   const [provider, apiKey, fromAddress, enabled] = await Promise.all([
     getSetting("email.provider"),
     getSetting("email.apiKey"),
@@ -64,20 +76,20 @@ async function sendViaResend(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ from, to, subject, html }),
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!resp.ok) {
       const body = await resp.text();
-      return { success: false, error: `Resend error ${resp.status}: ${body}` };
+      logger.warn({ to, status: resp.status, body }, "Resend API error");
+      return { success: false, error: `Resend ${resp.status}: ${body}` };
     }
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err?.message ?? "Unknown error" };
+    return { success: false, error: err?.message ?? "Network error" };
   }
 }
 
 function buildTransactionEmail(params: {
-  type: "transfer" | "topup" | "exchange" | "card";
   title: string;
   body: string;
   ref?: string;
@@ -118,18 +130,13 @@ export async function sendEmail(
   title: string,
   body: string,
   ref?: string,
-  type: "transfer" | "topup" | "exchange" | "card" = "transfer",
+  _type?: string,
 ): Promise<void> {
   try {
     const config = await getEmailConfig();
     if (!config.enabled || !config.apiKey) return;
-    const html = buildTransactionEmail({ type, title, body, ref });
-    let result: { success: boolean; error?: string };
-    if (config.provider === "resend") {
-      result = await sendViaResend(config.apiKey, config.fromAddress, to, subject, html);
-    } else {
-      return; // disabled
-    }
+    const html = buildTransactionEmail({ title, body, ref });
+    const result = await sendViaResend(config.apiKey, config.fromAddress, to, subject, html);
     if (!result.success) {
       logger.warn({ to, error: result.error }, "Email send failed");
     }
@@ -138,16 +145,14 @@ export async function sendEmail(
   }
 }
 
-/**
- * Fire-and-forget email — fetches user email from DB and sends.
- */
+/** Fire-and-forget email. */
 export function emailAsync(
   to: string | null | undefined,
   subject: string,
   title: string,
   body: string,
   ref?: string,
-  type?: "transfer" | "topup" | "exchange" | "card",
+  type?: string,
 ): void {
   if (!to) return;
   sendEmail(to, subject, title, body, ref, type).catch(() => {});
@@ -155,17 +160,13 @@ export function emailAsync(
 
 export async function sendTestEmail(to: string): Promise<{ success: boolean; error?: string }> {
   const config = await getEmailConfig();
-  if (!config.enabled || !config.apiKey) {
-    return { success: false, error: "Email is not enabled or API key is missing." };
+  if (!config.apiKey) {
+    return { success: false, error: "No API key configured. Set RESEND_API_KEY in Secrets or save it in the Email Config page." };
   }
   const html = buildTransactionEmail({
-    type: "transfer",
-    title: "Test Email",
-    body: "This is a test email from Trust Corp Bank admin panel. Email notifications are working correctly.",
+    title: "Test Email ✓",
+    body: "This is a test email from Trust Corp Bank. If you received this, email notifications are working correctly.",
     ref: "TEST-" + Date.now(),
   });
-  if (config.provider === "resend") {
-    return sendViaResend(config.apiKey, config.fromAddress, to, "Test Email — Trust Corp Bank", html);
-  }
-  return { success: false, error: "No provider configured." };
+  return sendViaResend(config.apiKey, config.fromAddress, to, "Test Email — Trust Corp Bank", html);
 }
