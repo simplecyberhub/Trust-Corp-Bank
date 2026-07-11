@@ -274,7 +274,7 @@ export function Transfer() {
     );
   }
 
-  function executeTopUp() {
+/* function executeTopUp() {
     topUp.mutate(
       { data: { accountId: parseInt(topupAccount), amount: parseFloat(topupAmount), currency: topupCurrency } },
       {
@@ -287,7 +287,7 @@ export function Transfer() {
         onError: (err: any) => toast({ title: "Top up failed", description: err?.data?.error ?? err?.message ?? "An error occurred.", variant: "destructive" }),
       },
     );
-  }
+  } */
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
