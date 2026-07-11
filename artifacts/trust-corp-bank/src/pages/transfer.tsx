@@ -20,7 +20,7 @@ type Tab = "send" | "topup";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF", "NGN", "ZAR", "AED"];
 
-/* ─── PIN Keypad ─────────────────────────────────────────────────────────── */
+/* ─── PIN Keypad ─────────────────────────────────────────────────────────────── */
 function PinKeypad({
   value,
   onChange,
@@ -162,7 +162,7 @@ function PinConfirmDialog({
   );
 }
 
-/* ─── Transfer Page ──────────────────────────────────────────────────────── */
+/* ─── Transfer Page ────────────────────────────────────────────────────────────── */
 export function Transfer() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -486,7 +486,7 @@ export function Transfer() {
                         onClick={() => selectedBeneficiary === ben.id ? clearBeneficiary() : handlePickBeneficiary(ben)}
                         className="flex flex-col items-center gap-1.5 shrink-0 group"
                       >
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold border-2 transition-colors ${selectedBeneficiary === ben.id ? "bg-primary text-white border-primary" : "bg-card text-primary border-border hover:border-primary/50"}`}>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold border-2 transition-colors ${selectedBeneficiary === ben.id ? "bg-primary text-white border-primary" : "bg-primary/10 text-primary border-primary/30 hover:border-primary/60"}`}>
                           {ben.name.charAt(0).toUpperCase()}
                         </div>
                         <span className="text-[11px] font-medium text-muted-foreground truncate w-14 text-center">{ben.name.split(" ")[0]}</span>
@@ -564,7 +564,7 @@ export function Transfer() {
                   {/* Recipient Name */}
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recipient Full Name</Label>
-                    <Input value={sendRecipientName} onChange={(e) => setSendRecipientName(e.target.value)} placeholder="Full legal name as on bank account" className="bg-card border-border h-12 rounded-xl" data-testid="input-recipient-name" />
+                    <Input value={sendRecipientName} onChange={(e) => setSendRecipientName(e.target.value)} placeholder="Full legal name as on bank account" className="bg-card border-border h-12 rounded-xl" />
                   </div>
 
                   {/* Bank Name */}
@@ -578,12 +578,12 @@ export function Transfer() {
                       {/* Account Number */}
                       <div className="space-y-1.5">
                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Account Number</Label>
-                        <Input value={sendRecipientAccount} onChange={(e) => setSendRecipientAccount(e.target.value)} placeholder="Recipient account number" className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" data-testid="input-recipient-account" />
+                        <Input value={sendRecipientAccount} onChange={(e) => setSendRecipientAccount(e.target.value)} placeholder="Recipient account number" className="bg-card border-border h-12 rounded-xl" />
                       </div>
                       {/* Routing Number */}
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Routing Number <span className="text-muted-foreground normal-case font-normal">(ABA/ACH)</span></Label>
-                        <Input value={routingNumber} onChange={(e) => setRoutingNumber(e.target.value)} placeholder="9-digit routing number" maxLength={9} className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" />
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Routing Number <span className="text-muted-foreground normal-case font-normal">(ABA)</span></Label>
+                        <Input value={routingNumber} onChange={(e) => setRoutingNumber(e.target.value)} placeholder="9-digit routing number" maxLength={9} className="bg-card border-border h-12 rounded-xl" />
                       </div>
                     </>
                   ) : (
@@ -591,14 +591,14 @@ export function Transfer() {
                       {/* SWIFT/BIC */}
                       <div className="space-y-1.5">
                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SWIFT / BIC Code</Label>
-                        <Input value={swiftCode} onChange={(e) => setSwiftCode(e.target.value.toUpperCase())} placeholder="e.g. CHASUS33, BARCGB22" maxLength={11} className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" />
+                        <Input value={swiftCode} onChange={(e) => setSwiftCode(e.target.value.toUpperCase())} placeholder="e.g. CHASUS33, BARCGB22" maxLength={11} className="bg-card border-border h-12 rounded-xl" />
                       </div>
                       {/* IBAN */}
                       <div className="space-y-1.5">
                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">IBAN <span className="text-muted-foreground normal-case font-normal">(or account number)</span></Label>
-                        <Input value={iban} onChange={(e) => setIban(e.target.value.toUpperCase())} placeholder="e.g. GB29NWBK60161331926819" className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" />
+                        <Input value={iban} onChange={(e) => setIban(e.target.value.toUpperCase())} placeholder="e.g. GB29NWBK60161331926819" className="bg-card border-border h-12 rounded-xl font-mono text-sm" />
                         {!iban && (
-                          <Input value={sendRecipientAccount} onChange={(e) => setSendRecipientAccount(e.target.value)} placeholder="Or enter account number" className="bg-card border-border h-12 rounded-xl font-mono tracking-wider" data-testid="input-recipient-account" />
+                          <Input value={sendRecipientAccount} onChange={(e) => setSendRecipientAccount(e.target.value)} placeholder="Or enter account number" className="bg-card border-border h-12 rounded-xl" />
                         )}
                       </div>
                       {/* Bank Country */}
@@ -646,7 +646,7 @@ export function Transfer() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Note (optional)</Label>
-                <Input value={sendDescription} onChange={(e) => setSendDescription(e.target.value)} placeholder="What's this for?" className="bg-card border-border h-12 rounded-xl" data-testid="input-send-note" />
+                <Input value={sendDescription} onChange={(e) => setSendDescription(e.target.value)} placeholder="What's this for?" className="bg-card border-border h-12 rounded-xl" data-testid="input-send-description" />
               </div>
 
               <Button
@@ -680,10 +680,10 @@ export function Transfer() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <button type="button" onClick={() => { handlePickBeneficiary(ben); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="text-xs text-primary font-medium px-2.5 py-1 bg-primary/10 rounded-full hover:bg-primary/20 transition-colors">
+                        <button type="button" onClick={() => { handlePickBeneficiary(ben); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="text-xs text-primary font-medium px-2.5 py-1 bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors">
                           Select
                         </button>
-                        <button type="button" onClick={() => deleteBenef.mutate({ beneficiaryId: ben.id }, { onSuccess: () => { toast({ title: "Beneficiary removed" }); queryClient.invalidateQueries({ queryKey: getListBeneficiariesQueryKey() }); } })} className="text-muted-foreground hover:text-destructive transition-colors p-1" data-testid={`delete-beneficiary-${ben.id}`}>
+                        <button type="button" onClick={() => deleteBenef.mutate({ beneficiaryId: ben.id }, { onSuccess: () => { toast({ title: "Beneficiary removed" }); queryClient.invalidateQueries({ queryKey: getListBeneficiariesQueryKey() }); } })} className="p-1 text-muted-foreground hover:text-white transition-colors" data-testid={`button-delete-beneficiary-${ben.id}`}>
                           <Trash2 size={15} />
                         </button>
                       </div>
@@ -695,8 +695,9 @@ export function Transfer() {
           </div>
         )}
 
-        {/* ─── TOP UP TAB ─── */}
-        {activeTab === "topup" && (
+        {/* ─── TOP UP TAB (HIDDEN) ─── */}
+        {/* This section is disabled and hidden from the UI */}
+        {false && activeTab === "topup" && (
           <form onSubmit={handleTopUp} className="space-y-5">
             <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-start gap-3">
               <ArrowDownToLine size={20} className="text-primary mt-0.5 shrink-0" />
