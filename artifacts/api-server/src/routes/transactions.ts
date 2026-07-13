@@ -6,7 +6,6 @@ import {
   ListTransactionsQueryParams,
   GetTransactionParams,
   SendMoneyBody,
-  TopUpAccountBody,
 } from "@workspace/api-zod";
 import { getUserId } from "./accounts";
 import { randomBytes } from "crypto";
@@ -251,86 +250,9 @@ router.post("/transactions/send", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/transactions/topup", async (req, res): Promise<void> => {
-  const { userId: clerkId } = getAuth(req);
-  if (!clerkId) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const parse = TopUpAccountBody.safeParse(req.body);
-  if (!parse.success) { res.status(400).json({ error: parse.error.message }); return; }
-  try {
-    const uid = await getUserId(clerkId);
-    if (!uid) { res.status(404).json({ error: "User not found" }); return; }
-
-    // Enforce admin-set user restrictions
-    const [userFlags] = await db.select({
-      banned: usersTable.banned,
-      hardFrozen: usersTable.hardFrozen,
-    }).from(usersTable).where(eq(usersTable.id, uid)).limit(1);
-    if (userFlags?.banned) {
-      res.status(403).json({ error: "Your account has been suspended. Please contact support." }); return;
-    }
-    if (userFlags?.hardFrozen) {
-      res.status(403).json({ error: "Your accounts are currently frozen. Please contact support." }); return;
-    }
-
-    const { accountId, amount, currency } = parse.data;
-
-    const tx = await db.transaction(async (trx) => {
-      const [account] = await trx.select().from(accountsTable)
-        .where(and(eq(accountsTable.id, accountId), eq(accountsTable.userId, uid)));
-      if (!account) throw Object.assign(new Error("Account not found"), { status: 404 });
-
-      const newBalance = account.balance + amount;
-      await trx.update(accountsTable)
-        .set({ balance: newBalance, updatedAt: new Date() })
-        .where(eq(accountsTable.id, accountId));
-
-      const [inserted] = await trx.insert(transactionsTable).values({
-        accountId,
-        type: "topup",
-        amount,
-        currency,
-        status: "completed",
-        description: "Account top up",
-        reference: genRef(),
-        balanceAfter: newBalance,
-      }).returning();
-
-      return inserted;
-    });
-
-    res.status(201).json(formatTx(tx));
-
-    // Fire SMS + email + in-app notification asynchronously
-    const fmtBal2 = Number(tx.balanceAfter ?? 0).toFixed(2);
-    const fmtAmt2 = Number(amount).toFixed(2);
-    notifyAsync(uid, "Account Top Up", `Your account was credited ${currency} ${fmtAmt2}. New balance: ${currency} ${fmtBal2}. Ref: ${tx.reference ?? ""}.`, "transaction");
-
-    db.select({ email: usersTable.email, phone: usersTable.phone })
-      .from(usersTable).where(eq(usersTable.id, uid)).limit(1)
-      .then(([u]) => {
-        if (u?.phone) {
-          sendSms(u.phone, formatSmsAlert("topup", {
-            currency, amount, ref: tx.reference ?? "", balance: tx.balanceAfter ?? 0,
-          })).catch(() => {});
-        }
-        if (u?.email) {
-          emailAsync(
-            u.email,
-            `Account Credited — ${currency} ${fmtAmt2}`,
-            "Account Top Up",
-            `Your account has been credited <strong>${currency} ${fmtAmt2}</strong>.<br>New balance: ${currency} ${fmtBal2}.`,
-            tx.reference ?? undefined,
-            "topup",
-          );
-        }
-      }).catch(() => {});
-
-  } catch (err: any) {
-    if (err.status === 404) { res.status(404).json({ error: err.message }); return; }
-    req.log.error({ err }, "topUpAccount error");
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+// Note: instant self-service top-up has been replaced by the deposit-request
+// flow (see routes/deposits.ts), which requires admin approval before any
+// balance is credited. Approval crediting logic lives in routes/admin.ts.
 
 function formatTx(t: typeof transactionsTable.$inferSelect) {
   return {

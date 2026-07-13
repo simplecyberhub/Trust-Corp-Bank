@@ -222,25 +222,6 @@ paths:
         "400":
           description: Insufficient funds or invalid input
 
-  /transactions/topup:
-    post:
-      operationId: topUpAccount
-      tags: [transactions]
-      summary: Top up an account
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/TopUpInput"
-      responses:
-        "201":
-          description: Top-up completed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Transaction"
-
   /transactions/activity:
     get:
       operationId: getRecentActivity
@@ -303,6 +284,38 @@ paths:
         "204":
           description: Deleted
 
+  /deposits:
+    get:
+      operationId: listDepositRequests
+      tags: [transactions]
+      summary: List the current user's deposit requests
+      responses:
+        "200":
+          description: Deposit request list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DepositRequest"
+    post:
+      operationId: createDepositRequest
+      tags: [transactions]
+      summary: Submit a deposit request for admin review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositRequestInput"
+      responses:
+        "201":
+          description: Deposit request created (pending review)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepositRequest"
+
   /cards:
     get:
       operationId: listCards
@@ -356,7 +369,7 @@ paths:
     patch:
       operationId: updateCard
       tags: [cards]
-      summary: Freeze or update card
+      summary: Freeze, update controls, or update card
       parameters:
         - name: cardId
           in: path
@@ -376,6 +389,52 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Card"
+
+  /cards/{cardId}/reveal:
+    post:
+      operationId: revealCard
+      tags: [cards]
+      summary: Reveal full card number and CVV (requires transaction PIN)
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevealCardInput"
+      responses:
+        "200":
+          description: Full card details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardReveal"
+        "403":
+          description: Invalid or missing PIN
+
+  /cards/{cardId}/report-lost:
+    post:
+      operationId: reportCardLost
+      tags: [cards]
+      summary: Report a card lost or stolen — cancels it and issues a replacement
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Card cancelled and replacement issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardReplaceResult"
 
   /notifications:
     get:
@@ -739,20 +798,6 @@ components:
         description:
           type: string
 
-    TopUpInput:
-      type: object
-      required: [accountId, amount, currency]
-      properties:
-        accountId:
-          type: integer
-        amount:
-          type: number
-        currency:
-          type: string
-        source:
-          type: string
-          default: external
-
     Beneficiary:
       type: object
       required: [id, userId, name, accountNumber, bankName, createdAt]
@@ -804,6 +849,10 @@ components:
           type: string
         holderName:
           type: string
+        nickname:
+          type: ["string", "null"]
+        color:
+          type: string
         expiryMonth:
           type: integer
         expiryYear:
@@ -816,6 +865,20 @@ components:
           enum: [visa, mastercard]
         spendLimit:
           type: ["number", "null"]
+        dailyLimit:
+          type: ["number", "null"]
+        contactlessEnabled:
+          type: boolean
+        onlineEnabled:
+          type: boolean
+        atmEnabled:
+          type: boolean
+        internationalEnabled:
+          type: boolean
+        lostReportedAt:
+          type: ["string", "null"]
+        replacesCardId:
+          type: ["integer", "null"]
         createdAt:
           type: string
 
@@ -841,7 +904,99 @@ components:
           type: string
           enum: [active, frozen, cancelled]
         spendLimit:
+          type: ["number", "null"]
+        dailyLimit:
+          type: ["number", "null"]
+        nickname:
+          type: string
+        color:
+          type: string
+        contactlessEnabled:
+          type: boolean
+        onlineEnabled:
+          type: boolean
+        atmEnabled:
+          type: boolean
+        internationalEnabled:
+          type: boolean
+
+    RevealCardInput:
+      type: object
+      required: [pin]
+      properties:
+        pin:
+          type: string
+
+    CardReveal:
+      type: object
+      required: [fullNumber, cvv, expiryMonth, expiryYear]
+      properties:
+        fullNumber:
+          type: string
+        cvv:
+          type: string
+        expiryMonth:
+          type: integer
+        expiryYear:
+          type: integer
+
+    CardReplaceResult:
+      type: object
+      required: [cancelledCard, replacementCard]
+      properties:
+        cancelledCard:
+          $ref: "#/components/schemas/Card"
+        replacementCard:
+          $ref: "#/components/schemas/Card"
+
+    DepositRequest:
+      type: object
+      required: [id, userId, accountId, amount, currency, method, status, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        accountId:
+          type: integer
+        amount:
           type: number
+        currency:
+          type: string
+        method:
+          type: string
+          enum: [bank_transfer, wire, check, cash]
+        reference:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        rejectionReason:
+          type: ["string", "null"]
+        reviewedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    DepositRequestInput:
+      type: object
+      required: [accountId, amount, currency, method]
+      properties:
+        accountId:
+          type: integer
+        amount:
+          type: number
+        currency:
+          type: string
+        method:
+          type: string
+          enum: [bank_transfer, wire, check, cash]
+        reference:
+          type: string
+        note:
+          type: string
 
     Notification:
       type: object

@@ -31,7 +31,6 @@ export const GetMeResponse = zod.object({
   "dateOfBirth": zod.string().nullish(),
   "role": zod.string(),
   "hasPin": zod.boolean(),
-  "totpEnabled": zod.boolean(),
   "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -60,7 +59,6 @@ export const UpdateMeResponse = zod.object({
   "dateOfBirth": zod.string().nullish(),
   "role": zod.string(),
   "hasPin": zod.boolean(),
-  "totpEnabled": zod.boolean(),
   "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -91,7 +89,6 @@ export const SubmitKycResponse = zod.object({
   "dateOfBirth": zod.string().nullish(),
   "role": zod.string(),
   "hasPin": zod.boolean(),
-  "totpEnabled": zod.boolean(),
   "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -237,19 +234,6 @@ export const SendMoneyBody = zod.object({
 
 
 /**
- * @summary Top up an account
- */
-export const topUpAccountBodySourceDefault = `external`;
-
-export const TopUpAccountBody = zod.object({
-  "accountId": zod.number(),
-  "amount": zod.number(),
-  "currency": zod.string(),
-  "source": zod.string().default(topUpAccountBodySourceDefault)
-})
-
-
-/**
  * @summary Get recent activity feed
  */
 export const GetRecentActivityResponseItem = zod.object({
@@ -307,6 +291,39 @@ export const DeleteBeneficiaryParams = zod.object({
 
 
 /**
+ * @summary List the current user's deposit requests
+ */
+export const ListDepositRequestsResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "accountId": zod.number(),
+  "amount": zod.number(),
+  "currency": zod.string(),
+  "method": zod.enum(['bank_transfer', 'wire', 'check', 'cash']),
+  "reference": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "rejectionReason": zod.string().nullish(),
+  "reviewedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListDepositRequestsResponse = zod.array(ListDepositRequestsResponseItem)
+
+
+/**
+ * @summary Submit a deposit request for admin review
+ */
+export const CreateDepositRequestBody = zod.object({
+  "accountId": zod.number(),
+  "amount": zod.number(),
+  "currency": zod.string(),
+  "method": zod.enum(['bank_transfer', 'wire', 'check', 'cash']),
+  "reference": zod.string().optional(),
+  "note": zod.string().optional()
+})
+
+
+/**
  * @summary List user cards
  */
 export const ListCardsResponseItem = zod.object({
@@ -316,11 +333,20 @@ export const ListCardsResponseItem = zod.object({
   "cardType": zod.enum(['virtual', 'physical']),
   "last4": zod.string(),
   "holderName": zod.string().optional(),
+  "nickname": zod.string().nullish(),
+  "color": zod.string().optional(),
   "expiryMonth": zod.number(),
   "expiryYear": zod.number(),
   "status": zod.enum(['active', 'frozen', 'cancelled']),
   "network": zod.enum(['visa', 'mastercard']).optional(),
   "spendLimit": zod.number().nullish(),
+  "dailyLimit": zod.number().nullish(),
+  "contactlessEnabled": zod.boolean().optional(),
+  "onlineEnabled": zod.boolean().optional(),
+  "atmEnabled": zod.boolean().optional(),
+  "internationalEnabled": zod.boolean().optional(),
+  "lostReportedAt": zod.string().nullish(),
+  "replacesCardId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 export const ListCardsResponse = zod.array(ListCardsResponseItem)
@@ -351,17 +377,26 @@ export const GetCardResponse = zod.object({
   "cardType": zod.enum(['virtual', 'physical']),
   "last4": zod.string(),
   "holderName": zod.string().optional(),
+  "nickname": zod.string().nullish(),
+  "color": zod.string().optional(),
   "expiryMonth": zod.number(),
   "expiryYear": zod.number(),
   "status": zod.enum(['active', 'frozen', 'cancelled']),
   "network": zod.enum(['visa', 'mastercard']).optional(),
   "spendLimit": zod.number().nullish(),
+  "dailyLimit": zod.number().nullish(),
+  "contactlessEnabled": zod.boolean().optional(),
+  "onlineEnabled": zod.boolean().optional(),
+  "atmEnabled": zod.boolean().optional(),
+  "internationalEnabled": zod.boolean().optional(),
+  "lostReportedAt": zod.string().nullish(),
+  "replacesCardId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
 
 /**
- * @summary Freeze or update card
+ * @summary Freeze, update controls, or update card
  */
 export const UpdateCardParams = zod.object({
   "cardId": zod.coerce.number()
@@ -369,7 +404,14 @@ export const UpdateCardParams = zod.object({
 
 export const UpdateCardBody = zod.object({
   "status": zod.enum(['active', 'frozen', 'cancelled']).optional(),
-  "spendLimit": zod.number().optional()
+  "spendLimit": zod.number().nullish(),
+  "dailyLimit": zod.number().nullish(),
+  "nickname": zod.string().optional(),
+  "color": zod.string().optional(),
+  "contactlessEnabled": zod.boolean().optional(),
+  "onlineEnabled": zod.boolean().optional(),
+  "atmEnabled": zod.boolean().optional(),
+  "internationalEnabled": zod.boolean().optional()
 })
 
 export const UpdateCardResponse = zod.object({
@@ -379,12 +421,97 @@ export const UpdateCardResponse = zod.object({
   "cardType": zod.enum(['virtual', 'physical']),
   "last4": zod.string(),
   "holderName": zod.string().optional(),
+  "nickname": zod.string().nullish(),
+  "color": zod.string().optional(),
   "expiryMonth": zod.number(),
   "expiryYear": zod.number(),
   "status": zod.enum(['active', 'frozen', 'cancelled']),
   "network": zod.enum(['visa', 'mastercard']).optional(),
   "spendLimit": zod.number().nullish(),
+  "dailyLimit": zod.number().nullish(),
+  "contactlessEnabled": zod.boolean().optional(),
+  "onlineEnabled": zod.boolean().optional(),
+  "atmEnabled": zod.boolean().optional(),
+  "internationalEnabled": zod.boolean().optional(),
+  "lostReportedAt": zod.string().nullish(),
+  "replacesCardId": zod.number().nullish(),
   "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Reveal full card number and CVV (requires transaction PIN)
+ */
+export const RevealCardParams = zod.object({
+  "cardId": zod.coerce.number()
+})
+
+export const RevealCardBody = zod.object({
+  "pin": zod.string()
+})
+
+export const RevealCardResponse = zod.object({
+  "fullNumber": zod.string(),
+  "cvv": zod.string(),
+  "expiryMonth": zod.number(),
+  "expiryYear": zod.number()
+})
+
+
+/**
+ * @summary Report a card lost or stolen — cancels it and issues a replacement
+ */
+export const ReportCardLostParams = zod.object({
+  "cardId": zod.coerce.number()
+})
+
+export const ReportCardLostResponse = zod.object({
+  "cancelledCard": zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "accountId": zod.number(),
+  "cardType": zod.enum(['virtual', 'physical']),
+  "last4": zod.string(),
+  "holderName": zod.string().optional(),
+  "nickname": zod.string().nullish(),
+  "color": zod.string().optional(),
+  "expiryMonth": zod.number(),
+  "expiryYear": zod.number(),
+  "status": zod.enum(['active', 'frozen', 'cancelled']),
+  "network": zod.enum(['visa', 'mastercard']).optional(),
+  "spendLimit": zod.number().nullish(),
+  "dailyLimit": zod.number().nullish(),
+  "contactlessEnabled": zod.boolean().optional(),
+  "onlineEnabled": zod.boolean().optional(),
+  "atmEnabled": zod.boolean().optional(),
+  "internationalEnabled": zod.boolean().optional(),
+  "lostReportedAt": zod.string().nullish(),
+  "replacesCardId": zod.number().nullish(),
+  "createdAt": zod.string()
+}),
+  "replacementCard": zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "accountId": zod.number(),
+  "cardType": zod.enum(['virtual', 'physical']),
+  "last4": zod.string(),
+  "holderName": zod.string().optional(),
+  "nickname": zod.string().nullish(),
+  "color": zod.string().optional(),
+  "expiryMonth": zod.number(),
+  "expiryYear": zod.number(),
+  "status": zod.enum(['active', 'frozen', 'cancelled']),
+  "network": zod.enum(['visa', 'mastercard']).optional(),
+  "spendLimit": zod.number().nullish(),
+  "dailyLimit": zod.number().nullish(),
+  "contactlessEnabled": zod.boolean().optional(),
+  "onlineEnabled": zod.boolean().optional(),
+  "atmEnabled": zod.boolean().optional(),
+  "internationalEnabled": zod.boolean().optional(),
+  "lostReportedAt": zod.string().nullish(),
+  "replacesCardId": zod.number().nullish(),
+  "createdAt": zod.string()
+})
 })
 
 

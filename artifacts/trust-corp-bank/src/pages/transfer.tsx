@@ -16,7 +16,7 @@ import { useLocation, useSearch } from "wouter";
 import { Send, Plus, Trash2, ArrowDownToLine, X, Building2, Lock, Delete, ShieldAlert, KeyRound } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type Tab = "send" | "topup";
+type Tab = "send";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF", "NGN", "ZAR", "AED"];
 

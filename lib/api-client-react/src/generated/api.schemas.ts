@@ -35,7 +35,6 @@ export interface UserProfile {
   dateOfBirth?: string | null;
   role: string;
   hasPin: boolean;
-  totpEnabled: boolean;
   phoneVerified: boolean;
   createdAt: string;
   updatedAt?: string;
@@ -189,13 +188,6 @@ export interface SendInput {
   description: string;
 }
 
-export interface TopUpInput {
-  accountId: number;
-  amount: number;
-  currency: string;
-  source?: string;
-}
-
 export interface Beneficiary {
   id: number;
   userId: number;
@@ -247,12 +239,25 @@ export interface Card {
   cardType: CardCardType;
   last4: string;
   holderName?: string;
+  /** @nullable */
+  nickname?: string | null;
+  color?: string;
   expiryMonth: number;
   expiryYear: number;
   status: CardStatus;
   network?: CardNetwork;
   /** @nullable */
   spendLimit?: number | null;
+  /** @nullable */
+  dailyLimit?: number | null;
+  contactlessEnabled?: boolean;
+  onlineEnabled?: boolean;
+  atmEnabled?: boolean;
+  internationalEnabled?: boolean;
+  /** @nullable */
+  lostReportedAt?: string | null;
+  /** @nullable */
+  replacesCardId?: number | null;
   createdAt: string;
 }
 
@@ -290,7 +295,89 @@ export const CardUpdateStatus = {
 
 export interface CardUpdate {
   status?: CardUpdateStatus;
-  spendLimit?: number;
+  /** @nullable */
+  spendLimit?: number | null;
+  /** @nullable */
+  dailyLimit?: number | null;
+  nickname?: string;
+  color?: string;
+  contactlessEnabled?: boolean;
+  onlineEnabled?: boolean;
+  atmEnabled?: boolean;
+  internationalEnabled?: boolean;
+}
+
+export interface RevealCardInput {
+  pin: string;
+}
+
+export interface CardReveal {
+  fullNumber: string;
+  cvv: string;
+  expiryMonth: number;
+  expiryYear: number;
+}
+
+export interface CardReplaceResult {
+  cancelledCard: Card;
+  replacementCard: Card;
+}
+
+export type DepositRequestMethod = typeof DepositRequestMethod[keyof typeof DepositRequestMethod];
+
+
+export const DepositRequestMethod = {
+  bank_transfer: 'bank_transfer',
+  wire: 'wire',
+  check: 'check',
+  cash: 'cash',
+} as const;
+
+export type DepositRequestStatus = typeof DepositRequestStatus[keyof typeof DepositRequestStatus];
+
+
+export const DepositRequestStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface DepositRequest {
+  id: number;
+  userId: number;
+  accountId: number;
+  amount: number;
+  currency: string;
+  method: DepositRequestMethod;
+  /** @nullable */
+  reference?: string | null;
+  /** @nullable */
+  note?: string | null;
+  status: DepositRequestStatus;
+  /** @nullable */
+  rejectionReason?: string | null;
+  /** @nullable */
+  reviewedAt?: string | null;
+  createdAt: string;
+}
+
+export type DepositRequestInputMethod = typeof DepositRequestInputMethod[keyof typeof DepositRequestInputMethod];
+
+
+export const DepositRequestInputMethod = {
+  bank_transfer: 'bank_transfer',
+  wire: 'wire',
+  check: 'check',
+  cash: 'cash',
+} as const;
+
+export interface DepositRequestInput {
+  accountId: number;
+  amount: number;
+  currency: string;
+  method: DepositRequestInputMethod;
+  reference?: string;
+  note?: string;
 }
 
 export type NotificationType = typeof NotificationType[keyof typeof NotificationType];

@@ -3,6 +3,7 @@ export * from "./accounts";
 export * from "./transactions";
 export * from "./beneficiaries";
 export * from "./cards";
+export * from "./deposits";
 export * from "./notifications";
 export * from "./otps";
 export * from "./settings";

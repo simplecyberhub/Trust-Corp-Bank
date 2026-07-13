@@ -9,5 +9,14 @@ import type { CardUpdateStatus } from './cardUpdateStatus';
 
 export interface CardUpdate {
   status?: CardUpdateStatus;
-  spendLimit?: number;
+  /** @nullable */
+  spendLimit?: number | null;
+  /** @nullable */
+  dailyLimit?: number | null;
+  nickname?: string;
+  color?: string;
+  contactlessEnabled?: boolean;
+  onlineEnabled?: boolean;
+  atmEnabled?: boolean;
+  internationalEnabled?: boolean;
 }

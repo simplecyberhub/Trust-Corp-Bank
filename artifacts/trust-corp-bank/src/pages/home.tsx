@@ -256,7 +256,6 @@ export function Home() {
       {/* Quick Actions */}
       <section className="grid grid-cols-4 gap-4">
         {[
-          { icon: Plus, label: "Top Up", href: "/transfer?type=topup" },
           { icon: Send, label: "Transfer", href: "/transfer" },
           { icon: RefreshCw, label: "Exchange", href: "/exchange" },
           { icon: MoreHorizontal, label: "More", href: "/profile" },

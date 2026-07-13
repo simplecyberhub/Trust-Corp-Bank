@@ -27,9 +27,13 @@ import type {
   BeneficiaryInput,
   Card,
   CardInput,
+  CardReplaceResult,
+  CardReveal,
   CardUpdate,
   ConversionInput,
   ConversionResult,
+  DepositRequest,
+  DepositRequestInput,
   ExchangeRates,
   GetExchangeRatesParams,
   HealthStatus,
@@ -44,8 +48,8 @@ import type {
   PinSetupInput,
   PinVerifyInput,
   PinVerifyResult,
+  RevealCardInput,
   SendInput,
-  TopUpInput,
   Transaction,
   TransactionList,
   UserProfile,
@@ -894,77 +898,6 @@ export const useSendMoney = <TError = ErrorType<void>,
       return useMutation(getSendMoneyMutationOptions(options));
     }
 
-export const getTopUpAccountUrl = () => {
-
-
-
-
-  return `/api/transactions/topup`
-}
-
-/**
- * @summary Top up an account
- */
-export const topUpAccount = async (topUpInput: TopUpInput, options?: RequestInit): Promise<Transaction> => {
-
-  return customFetch<Transaction>(getTopUpAccountUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      topUpInput,)
-  }
-);}
-
-
-
-
-export const getTopUpAccountMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof topUpAccount>>, TError,{data: BodyType<TopUpInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof topUpAccount>>, TError,{data: BodyType<TopUpInput>}, TContext> => {
-
-const mutationKey = ['topUpAccount'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof topUpAccount>>, {data: BodyType<TopUpInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  topUpAccount(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type TopUpAccountMutationResult = NonNullable<Awaited<ReturnType<typeof topUpAccount>>>
-    export type TopUpAccountMutationBody = BodyType<TopUpInput>
-    export type TopUpAccountMutationError = ErrorType<unknown>
-
-    /**
- * @summary Top up an account
- */
-export const useTopUpAccount = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof topUpAccount>>, TError,{data: BodyType<TopUpInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof topUpAccount>>,
-        TError,
-        {data: BodyType<TopUpInput>},
-        TContext
-      > => {
-      return useMutation(getTopUpAccountMutationOptions(options));
-    }
-
 export const getGetRecentActivityUrl = () => {
 
 
@@ -1260,6 +1193,154 @@ export const useDeleteBeneficiary = <TError = ErrorType<unknown>,
       return useMutation(getDeleteBeneficiaryMutationOptions(options));
     }
 
+export const getListDepositRequestsUrl = () => {
+
+
+
+
+  return `/api/deposits`
+}
+
+/**
+ * @summary List the current user's deposit requests
+ */
+export const listDepositRequests = async ( options?: RequestInit): Promise<DepositRequest[]> => {
+
+  return customFetch<DepositRequest[]>(getListDepositRequestsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDepositRequestsQueryKey = () => {
+    return [
+    `/api/deposits`
+    ] as const;
+    }
+
+
+export const getListDepositRequestsQueryOptions = <TData = Awaited<ReturnType<typeof listDepositRequests>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDepositRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDepositRequestsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDepositRequests>>> = ({ signal }) => listDepositRequests({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDepositRequests>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDepositRequestsQueryResult = NonNullable<Awaited<ReturnType<typeof listDepositRequests>>>
+export type ListDepositRequestsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the current user's deposit requests
+ */
+
+export function useListDepositRequests<TData = Awaited<ReturnType<typeof listDepositRequests>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDepositRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDepositRequestsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateDepositRequestUrl = () => {
+
+
+
+
+  return `/api/deposits`
+}
+
+/**
+ * @summary Submit a deposit request for admin review
+ */
+export const createDepositRequest = async (depositRequestInput: DepositRequestInput, options?: RequestInit): Promise<DepositRequest> => {
+
+  return customFetch<DepositRequest>(getCreateDepositRequestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      depositRequestInput,)
+  }
+);}
+
+
+
+
+export const getCreateDepositRequestMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDepositRequest>>, TError,{data: BodyType<DepositRequestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDepositRequest>>, TError,{data: BodyType<DepositRequestInput>}, TContext> => {
+
+const mutationKey = ['createDepositRequest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDepositRequest>>, {data: BodyType<DepositRequestInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDepositRequest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDepositRequestMutationResult = NonNullable<Awaited<ReturnType<typeof createDepositRequest>>>
+    export type CreateDepositRequestMutationBody = BodyType<DepositRequestInput>
+    export type CreateDepositRequestMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Submit a deposit request for admin review
+ */
+export const useCreateDepositRequest = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDepositRequest>>, TError,{data: BodyType<DepositRequestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDepositRequest>>,
+        TError,
+        {data: BodyType<DepositRequestInput>},
+        TContext
+      > => {
+      return useMutation(getCreateDepositRequestMutationOptions(options));
+    }
+
 export const getListCardsUrl = () => {
 
 
@@ -1494,7 +1575,7 @@ export const getUpdateCardUrl = (cardId: number,) => {
 }
 
 /**
- * @summary Freeze or update card
+ * @summary Freeze, update controls, or update card
  */
 export const updateCard = async (cardId: number,
     cardUpdate: CardUpdate, options?: RequestInit): Promise<Card> => {
@@ -1544,7 +1625,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateCardMutationError = ErrorType<unknown>
 
     /**
- * @summary Freeze or update card
+ * @summary Freeze, update controls, or update card
  */
 export const useUpdateCard = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCard>>, TError,{cardId: number;data: BodyType<CardUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1555,6 +1636,148 @@ export const useUpdateCard = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateCardMutationOptions(options));
+    }
+
+export const getRevealCardUrl = (cardId: number,) => {
+
+
+
+
+  return `/api/cards/${cardId}/reveal`
+}
+
+/**
+ * @summary Reveal full card number and CVV (requires transaction PIN)
+ */
+export const revealCard = async (cardId: number,
+    revealCardInput: RevealCardInput, options?: RequestInit): Promise<CardReveal> => {
+
+  return customFetch<CardReveal>(getRevealCardUrl(cardId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      revealCardInput,)
+  }
+);}
+
+
+
+
+export const getRevealCardMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revealCard>>, TError,{cardId: number;data: BodyType<RevealCardInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revealCard>>, TError,{cardId: number;data: BodyType<RevealCardInput>}, TContext> => {
+
+const mutationKey = ['revealCard'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revealCard>>, {cardId: number;data: BodyType<RevealCardInput>}> = (props) => {
+          const {cardId,data} = props ?? {};
+
+          return  revealCard(cardId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevealCardMutationResult = NonNullable<Awaited<ReturnType<typeof revealCard>>>
+    export type RevealCardMutationBody = BodyType<RevealCardInput>
+    export type RevealCardMutationError = ErrorType<void>
+
+    /**
+ * @summary Reveal full card number and CVV (requires transaction PIN)
+ */
+export const useRevealCard = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revealCard>>, TError,{cardId: number;data: BodyType<RevealCardInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revealCard>>,
+        TError,
+        {cardId: number;data: BodyType<RevealCardInput>},
+        TContext
+      > => {
+      return useMutation(getRevealCardMutationOptions(options));
+    }
+
+export const getReportCardLostUrl = (cardId: number,) => {
+
+
+
+
+  return `/api/cards/${cardId}/report-lost`
+}
+
+/**
+ * @summary Report a card lost or stolen — cancels it and issues a replacement
+ */
+export const reportCardLost = async (cardId: number, options?: RequestInit): Promise<CardReplaceResult> => {
+
+  return customFetch<CardReplaceResult>(getReportCardLostUrl(cardId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getReportCardLostMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportCardLost>>, TError,{cardId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportCardLost>>, TError,{cardId: number}, TContext> => {
+
+const mutationKey = ['reportCardLost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportCardLost>>, {cardId: number}> = (props) => {
+          const {cardId} = props ?? {};
+
+          return  reportCardLost(cardId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportCardLostMutationResult = NonNullable<Awaited<ReturnType<typeof reportCardLost>>>
+
+    export type ReportCardLostMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Report a card lost or stolen — cancels it and issues a replacement
+ */
+export const useReportCardLost = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportCardLost>>, TError,{cardId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportCardLost>>,
+        TError,
+        {cardId: number},
+        TContext
+      > => {
+      return useMutation(getReportCardLostMutationOptions(options));
     }
 
 export const getListNotificationsUrl = () => {

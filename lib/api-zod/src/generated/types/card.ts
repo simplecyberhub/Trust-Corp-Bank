@@ -16,11 +16,24 @@ export interface Card {
   cardType: CardCardType;
   last4: string;
   holderName?: string;
+  /** @nullable */
+  nickname?: string | null;
+  color?: string;
   expiryMonth: number;
   expiryYear: number;
   status: CardStatus;
   network?: CardNetwork;
   /** @nullable */
   spendLimit?: number | null;
+  /** @nullable */
+  dailyLimit?: number | null;
+  contactlessEnabled?: boolean;
+  onlineEnabled?: boolean;
+  atmEnabled?: boolean;
+  internationalEnabled?: boolean;
+  /** @nullable */
+  lostReportedAt?: string | null;
+  /** @nullable */
+  replacesCardId?: number | null;
   createdAt: string;
 }
