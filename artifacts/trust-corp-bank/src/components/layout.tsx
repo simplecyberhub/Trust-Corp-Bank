@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Home, Activity, Send, CreditCard, User, Bell } from "lucide-react";
+import { ChatWidget } from "@/components/chat-widget";
 import { useListNotifications, getListNotificationsQueryKey } from "@workspace/api-client-react";
 import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import { useUser } from "@clerk/react";
@@ -128,6 +129,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto pb-[76px]" id="main-content">
           {children}
         </main>
+
+        {/* Live Chat Widget */}
+        <ChatWidget />
 
         {/* Bottom Navigation */}
         <nav className="absolute bottom-0 left-0 right-0 bg-card/95 backdrop-blur-2xl border-t border-border/60" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>

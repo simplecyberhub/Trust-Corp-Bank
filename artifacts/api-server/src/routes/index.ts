@@ -11,6 +11,7 @@ import exchangeRouter from "./exchange";
 import adminRouter from "./admin";
 import otpRouter from "./otp";
 import supportRouter from "./support";
+import chatRouter from "./chat";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(exchangeRouter);
 router.use(adminRouter);
 router.use(otpRouter);
 router.use(supportRouter);
+router.use(chatRouter);
 
 export default router;

@@ -10,6 +10,7 @@ import { Transactions } from "@/pages/transactions";
 import { Accounts } from "@/pages/accounts";
 import { Sms } from "@/pages/sms";
 import { Support } from "@/pages/support";
+import { LiveChat } from "@/pages/live-chat";
 import { AuditLogs } from "@/pages/audit-logs";
 import { Reports } from "@/pages/reports";
 import { Email } from "@/pages/email";
@@ -155,6 +156,9 @@ function ClerkProviderWithRoutes() {
           </Route>
           <Route path="/email">
             <AppLayout><ErrorBoundary><Email /></ErrorBoundary></AppLayout>
+          </Route>
+          <Route path="/live-chat">
+            <AppLayout><ErrorBoundary><LiveChat /></ErrorBoundary></AppLayout>
           </Route>
           <Route path="/support">
             <AppLayout><ErrorBoundary><Support /></ErrorBoundary></AppLayout>

@@ -2,7 +2,7 @@ import { useLocation, Link } from "wouter";
 import { useClerk, useUser } from "@clerk/react";
 import {
   LayoutDashboard, Users, ArrowRightLeft, CreditCard, LogOut, Shield,
-  MessageSquare, LifeBuoy, ClipboardList, BarChart3, Mail,
+  MessageSquare, LifeBuoy, ClipboardList, BarChart3, Mail, MessagesSquare,
 } from "lucide-react";
 
 const nav = [
@@ -12,6 +12,7 @@ const nav = [
   { href: "/transactions", label: "Transactions", icon: ArrowRightLeft },
   { href: "/reports", label: "Reports & Exports", icon: BarChart3 },
   { divider: true },
+  { href: "/live-chat", label: "Live Chat", icon: MessagesSquare },
   { href: "/sms", label: "SMS Gateway", icon: MessageSquare },
   { href: "/email", label: "Email Notifications", icon: Mail },
   { href: "/support", label: "Support Tickets", icon: LifeBuoy },
