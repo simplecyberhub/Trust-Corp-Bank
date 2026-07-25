@@ -10,3 +10,4 @@ export * from "./settings";
 export * from "./sms-logs";
 export * from "./support-tickets";
 export * from "./audit-logs";
+export * from "./chat";
