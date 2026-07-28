@@ -12,7 +12,7 @@ interface ChatMessage {
 
 function useChatApi() {
   const { getToken } = useAuth();
-  const call = useCallback(async <T>(method: string, path: string, body?: unknown): Promise<T> => {
+  const call = useCallback(async <T,>(method: string, path: string, body?: unknown): Promise<T> => {
     const token = await getToken();
     const res = await fetch(`/api${path}`, {
       method,
