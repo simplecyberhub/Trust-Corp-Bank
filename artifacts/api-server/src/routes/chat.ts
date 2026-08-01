@@ -149,7 +149,7 @@ router.get("/admin/chat/sessions", async (req, res): Promise<void> => {
     const adminUid = await getUserId(clerkId);
     if (!adminUid) { res.status(403).json({ error: "Forbidden" }); return; }
     const [admin] = await db.select().from(usersTable).where(eq(usersTable.id, adminUid)).limit(1);
-    if (!admin?.isAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+    if (admin?.role !== "admin") { res.status(403).json({ error: "Forbidden" }); return; }
 
     const statusFilter = req.query["status"] as string | undefined;
 
@@ -188,7 +188,7 @@ router.get("/admin/chat/sessions/:id/messages", async (req, res): Promise<void> 
     const adminUid = await getUserId(clerkId);
     if (!adminUid) { res.status(403).json({ error: "Forbidden" }); return; }
     const [admin] = await db.select().from(usersTable).where(eq(usersTable.id, adminUid)).limit(1);
-    if (!admin?.isAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+    if (admin?.role !== "admin") { res.status(403).json({ error: "Forbidden" }); return; }
 
     const sessionId = parseInt(req.params["id"]);
     if (isNaN(sessionId)) { res.status(400).json({ error: "Invalid session id" }); return; }
@@ -227,7 +227,7 @@ router.post("/admin/chat/sessions/:id/messages", async (req, res): Promise<void>
     const adminUid = await getUserId(clerkId);
     if (!adminUid) { res.status(403).json({ error: "Forbidden" }); return; }
     const [admin] = await db.select().from(usersTable).where(eq(usersTable.id, adminUid)).limit(1);
-    if (!admin?.isAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+    if (admin?.role !== "admin") { res.status(403).json({ error: "Forbidden" }); return; }
 
     const sessionId = parseInt(req.params["id"]);
     if (isNaN(sessionId)) { res.status(400).json({ error: "Invalid session id" }); return; }
@@ -275,7 +275,7 @@ router.post("/admin/chat/sessions/:id/close", async (req, res): Promise<void> =>
     const adminUid = await getUserId(clerkId);
     if (!adminUid) { res.status(403).json({ error: "Forbidden" }); return; }
     const [admin] = await db.select().from(usersTable).where(eq(usersTable.id, adminUid)).limit(1);
-    if (!admin?.isAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+    if (admin?.role !== "admin") { res.status(403).json({ error: "Forbidden" }); return; }
 
     const sessionId = parseInt(req.params["id"]);
     if (isNaN(sessionId)) { res.status(400).json({ error: "Invalid session id" }); return; }
