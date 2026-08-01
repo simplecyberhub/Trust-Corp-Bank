@@ -35,6 +35,7 @@ export interface UserProfile {
   dateOfBirth?: string | null;
   role: string;
   hasPin: boolean;
+  totpEnabled: boolean;
   phoneVerified: boolean;
   createdAt: string;
   updatedAt?: string;

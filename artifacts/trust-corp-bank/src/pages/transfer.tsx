@@ -16,7 +16,7 @@ import { useLocation, useSearch } from "wouter";
 import { Send, Plus, Trash2, ArrowDownToLine, X, Building2, Lock, Delete, ShieldAlert, KeyRound } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type Tab = "send";
+type Tab = "send" | "topup";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF", "NGN", "ZAR", "AED"];
 
@@ -274,9 +274,9 @@ export function Transfer() {
     );
   }
 
-/* function executeTopUp() {
+  function executeTopUp() {
     topUp.mutate(
-      { data: { accountId: parseInt(topupAccount), amount: parseFloat(topupAmount), currency: topupCurrency } },
+      { data: { accountId: parseInt(topupAccount), amount: parseFloat(topupAmount), currency: topupCurrency, method: "bank_transfer" as const } },
       {
         onSuccess: () => {
           toast({ title: "Account topped up", description: `${topupCurrency} ${parseFloat(topupAmount).toFixed(2)} added successfully.` });
@@ -287,7 +287,7 @@ export function Transfer() {
         onError: (err: any) => toast({ title: "Top up failed", description: err?.data?.error ?? err?.message ?? "An error occurred.", variant: "destructive" }),
       },
     );
-  } */
+  }
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
