@@ -10,6 +10,11 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app: Express = express();
 
@@ -62,5 +67,13 @@ app.use(
 );
 
 app.use("/api", router);
+
+const publicDir = path.join(__dirname, "public");
+
+app.use(express.static(publicDir));
+
+app.get("*", (_, res) => {
+  res.sendFile(path.join(publicDir, "index.html"));
+});
 
 export default app;
