@@ -40,8 +40,11 @@ app.use(
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 // Restrict CORS to known trusted origins rather than reflecting any origin.
-// Allows Replit-hosted frontends (*.replit.app, *.replit.dev) and localhost for development.
-const TRUSTED_ORIGIN_RE = /^https?:\/\/(localhost(:\d+)?|[^/]+\.replit\.(app|dev))(\/.*)?$/;
+// Allows Replit-hosted frontends (*.replit.app, *.replit.dev), Render (*.onrender.com),
+// and any custom domain set via ALLOWED_ORIGIN env var, plus localhost for development.
+const EXTRA_ORIGIN = process.env.ALLOWED_ORIGIN;
+const TRUSTED_ORIGIN_RE =
+  /^https?:\/\/(localhost(:\d+)?|[^/]+\.replit\.(app|dev)|[^/]+\.onrender\.com)(\/.*)?$/;
 app.use(
   cors({
     credentials: true,
@@ -49,6 +52,7 @@ app.use(
       // Same-origin or server-to-server requests have no Origin header — allow them.
       if (!origin) return callback(null, true);
       if (TRUSTED_ORIGIN_RE.test(origin)) return callback(null, true);
+      if (EXTRA_ORIGIN && origin === EXTRA_ORIGIN) return callback(null, true);
       callback(new Error(`CORS: origin '${origin}' not allowed`));
     },
   }),
@@ -67,11 +71,16 @@ app.use(
 
 app.use("/api", router);
 
+// Serve the trust-corp-bank SPA.
+// The Vite build outputs directly into this directory:
+//   artifacts/trust-corp-bank/vite.config.ts → outDir: ../api-server/dist/public
+// so at runtime __dirname/public is the built frontend.
 const publicDir = path.join(__dirname, "public");
 
 app.use(express.static(publicDir));
 
-app.get("/", (_, res) => {
+// SPA fallback — any unmatched GET returns index.html so client-side routing works.
+app.get("/*path", (_, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
 });
 
