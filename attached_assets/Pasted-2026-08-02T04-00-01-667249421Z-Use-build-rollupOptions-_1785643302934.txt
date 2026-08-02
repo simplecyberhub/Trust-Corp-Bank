@@ -1,0 +1,50 @@
+2026-08-02T04:00:01.667249421Z - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2026-08-02T04:00:01.667250339Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+2026-08-02T04:00:01.667400332Z ✓ built in 2.96s
+2026-08-02T04:00:01.972070612Z 
+2026-08-02T04:00:01.972086694Z > @workspace/api-server@0.0.0 build /opt/render/project/src/artifacts/api-server
+2026-08-02T04:00:01.972096837Z > node ./build.mjs
+2026-08-02T04:00:01.972097823Z 
+2026-08-02T04:00:02.628943047Z 
+2026-08-02T04:00:02.628960339Z   dist/index.mjs                       2.7mb ⚠️
+2026-08-02T04:00:02.628961672Z   dist/pino-worker.mjs               153.4kb
+2026-08-02T04:00:02.628962448Z   dist/pino-file.mjs                 142.1kb
+2026-08-02T04:00:02.628963228Z   dist/pino-pretty.mjs               114.6kb
+2026-08-02T04:00:02.62896398Z   dist/thread-stream-worker.mjs        7.3kb
+2026-08-02T04:00:02.628964857Z   dist/index.mjs.map                   5.0mb
+2026-08-02T04:00:02.62896563Z   dist/pino-worker.mjs.map           256.9kb
+2026-08-02T04:00:02.628966389Z   dist/pino-file.mjs.map             229.0kb
+2026-08-02T04:00:02.628967372Z   dist/pino-pretty.mjs.map           204.0kb
+2026-08-02T04:00:02.628968141Z   dist/thread-stream-worker.mjs.map   12.0kb
+2026-08-02T04:00:02.628968854Z 
+2026-08-02T04:00:02.628969899Z ⚡ Done in 616ms
+2026-08-02T04:00:03.412879421Z ==> Uploading build...
+2026-08-02T04:00:09.136865762Z ==> Uploaded in 3.9s. Compression took 1.8s
+2026-08-02T04:00:09.140645457Z ==> Build successful 🎉
+2026-08-02T04:00:12.054147452Z ==> Deploying...
+2026-08-02T04:00:12.253309491Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-08-02T04:00:33.609313433Z ==> Running 'pnpm run start'
+2026-08-02T04:00:38.516050195Z 
+2026-08-02T04:00:38.516085816Z > workspace@0.0.0 start /opt/render/project/src
+2026-08-02T04:00:38.516092336Z > pnpm --filter @workspace/api-server run start
+2026-08-02T04:00:38.516095466Z 
+2026-08-02T04:00:43.307350901Z 
+2026-08-02T04:00:43.307378571Z > @workspace/api-server@0.0.0 start /opt/render/project/src/artifacts/api-server
+2026-08-02T04:00:43.307384191Z > node --enable-source-maps ./dist/index.mjs
+2026-08-02T04:00:43.307387751Z 
+2026-08-02T04:00:45.517995114Z {"level":30,"time":1785643245516,"pid":97,"hostname":"srv-d9fssjrtqb8s73b8d4i0-hibernate-7bc6cf65c8-8994m","port":3000,"msg":"Server listening"}
+2026-08-02T04:00:46.335440199Z Attention: Clerk collects telemetry data from its SDKs when connected to development instances.
+2026-08-02T04:00:46.335706585Z The data collected is used to inform Clerk's product roadmap.
+2026-08-02T04:00:46.335775296Z To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.
+2026-08-02T04:00:46.335783316Z 
+2026-08-02T04:00:46.575543689Z {"level":30,"time":1785643246574,"pid":97,"hostname":"srv-d9fssjrtqb8s73b8d4i0-hibernate-7bc6cf65c8-8994m","req":{"id":1,"method":"HEAD","url":"/"},"res":{"statusCode":404},"responseTime":246,"msg":"request completed"}
+2026-08-02T04:00:46.576354685Z Error: ENOENT: no such file or directory, stat '/opt/render/project/src/artifacts/api-server/dist/public/index.html'
+2026-08-02T04:00:52.903441846Z ==> Your service is live 🎉
+2026-08-02T04:00:53.089548729Z ==> 
+2026-08-02T04:00:53.092140508Z ==> ///////////////////////////////////////////////////////////
+2026-08-02T04:00:53.095249428Z ==> 
+2026-08-02T04:00:53.099244908Z ==> Available at your primary URL https://trustcorp.onrender.com
+2026-08-02T04:00:53.10204095Z ==> 
+2026-08-02T04:00:53.104080387Z ==> ///////////////////////////////////////////////////////////
+2026-08-02T04:00:53.293620112Z {"level":30,"time":1785643253293,"pid":97,"hostname":"srv-d9fssjrtqb8s73b8d4i0-hibernate-7bc6cf65c8-8994m","req":{"id":2,"method":"GET","url":"/"},"res":{"statusCode":404},"responseTime":3,"msg":"request completed"}
+2026-08-02T04:00:53.293736585Z Error: ENOENT: no such file or directory, stat '/opt/render/project/src/artifacts/api-server/dist/public/index.html'
