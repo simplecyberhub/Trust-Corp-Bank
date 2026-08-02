@@ -6,8 +6,12 @@
   "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
   "typecheck:libs": "tsc --build --force",
   "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-  "build": "pnpm run typecheck && pnpm --filter @workspace/trust-corp-bank build && pnpm --filter @workspace/api-server build",
-  "start": "pnpm --filter @workspace/api-server start"
+    "build": "pnpm run typecheck && pnpm --filter @workspace/trust-corp-bank build && pnpm --filter @workspace/api-server build",
+    "build:libs": "pnpm run typecheck:libs && pnpm --filter @workspace/trust-corp-bank build",
+    "build:api-server": "pnpm --filter @workspace/api-server build",
+  "dev": "pnpm --filter @workspace/api-server run dev",
+  "start": "pnpm --filter @workspace/api-server run start",
+     "lint": "prettier --write ."
   },
   
   "private": true,

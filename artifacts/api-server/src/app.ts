@@ -13,10 +13,9 @@ import { logger } from "./lib/logger";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+const app: Express = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const app: Express = express();
 
 app.use(
   pinoHttp({
@@ -72,7 +71,7 @@ const publicDir = path.join(__dirname, "public");
 
 app.use(express.static(publicDir));
 
-app.get("*", (_, res) => {
+app.get("/", (_, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
 });
 
