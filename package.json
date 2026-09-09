@@ -20,7 +20,7 @@
   "start": "pnpm --filter @workspace/api-server run start",
 
   "lint": "prettier --write ."
-}
+},
   
   "private": true,
   "devDependencies": {
