@@ -28,6 +28,13 @@ function stripBase(path: string): string {
 }
 
 const clerkAppearance = {
+
+  options: {
+
+    unsafe_disableDevelopmentModeWarnings: true,
+
+  },
+
   cssLayerName: "clerk",
   variables: {
     colorPrimary: "#1a56db",
