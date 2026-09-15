@@ -1,5 +1,6 @@
 export * from "./users";
 export * from "./accounts";
+export * from "./account-members";
 export * from "./transactions";
 export * from "./beneficiaries";
 export * from "./cards";

@@ -5,7 +5,9 @@
  * Trust Corp Bank API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BankAccountAccessRole } from './bankAccountAccessRole';
 import type { BankAccountAccountType } from './bankAccountAccountType';
+import type { BankAccountPermissions } from './bankAccountPermissions';
 import type { BankAccountStatus } from './bankAccountStatus';
 
 export interface BankAccount {
@@ -16,6 +18,9 @@ export interface BankAccount {
   currency: string;
   balance: number;
   status: BankAccountStatus;
+  accessRole: BankAccountAccessRole;
+  permissions: BankAccountPermissions;
+  memberCount: number;
   /** @nullable */
   nickname?: string | null;
   createdAt: string;

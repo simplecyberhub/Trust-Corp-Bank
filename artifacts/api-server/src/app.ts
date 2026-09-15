@@ -12,6 +12,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { appConfig } from "./config";
 
 const app: Express = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -42,7 +43,7 @@ app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 // Restrict CORS to known trusted origins rather than reflecting any origin.
 // Allows Replit-hosted frontends (*.replit.app, *.replit.dev), Render (*.onrender.com),
 // and any custom domain set via ALLOWED_ORIGIN env var, plus localhost for development.
-const EXTRA_ORIGIN = process.env.ALLOWED_ORIGIN;
+const EXTRA_ORIGINS = appConfig.allowedOrigins;
 const TRUSTED_ORIGIN_RE =
   /^https?:\/\/(localhost(:\d+)?|[^/]+\.replit\.(app|dev)|[^/]+\.onrender\.com)(\/.*)?$/;
 app.use(
@@ -52,7 +53,7 @@ app.use(
       // Same-origin or server-to-server requests have no Origin header — allow them.
       if (!origin) return callback(null, true);
       if (TRUSTED_ORIGIN_RE.test(origin)) return callback(null, true);
-      if (EXTRA_ORIGIN && origin === EXTRA_ORIGIN) return callback(null, true);
+      if (EXTRA_ORIGINS.includes(origin)) return callback(null, true);
       callback(new Error(`CORS: origin '${origin}' not allowed`));
     },
   }),
@@ -64,7 +65,7 @@ app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
       getClerkProxyHost(req) ?? "",
-      process.env.CLERK_PUBLISHABLE_KEY,
+      appConfig.clerkPublishableKey,
     ),
   })),
 );

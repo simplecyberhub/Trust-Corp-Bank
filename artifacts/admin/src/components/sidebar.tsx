@@ -2,7 +2,7 @@ import { useLocation, Link } from "wouter";
 import { useClerk, useUser } from "@clerk/react";
 import {
   LayoutDashboard, Users, ArrowRightLeft, CreditCard, LogOut, Shield,
-  MessageSquare, LifeBuoy, ClipboardList, BarChart3, Mail, MessagesSquare,
+  MessageSquare, LifeBuoy, ClipboardList, BarChart3, Mail, MessagesSquare, ServerCog,
 } from "lucide-react";
 
 const nav = [
@@ -17,6 +17,7 @@ const nav = [
   { href: "/email", label: "Email Notifications", icon: Mail },
   { href: "/support", label: "Support Tickets", icon: LifeBuoy },
   { href: "/audit-logs", label: "Audit Log", icon: ClipboardList },
+  { href: "/runtime", label: "Production Readiness", icon: ServerCog },
 ];
 
 export function Sidebar() {

@@ -31,6 +31,7 @@ export const GetMeResponse = zod.object({
   "dateOfBirth": zod.string().nullish(),
   "role": zod.string(),
   "hasPin": zod.boolean(),
+  "totpEnabled": zod.boolean(),
   "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -59,6 +60,7 @@ export const UpdateMeResponse = zod.object({
   "dateOfBirth": zod.string().nullish(),
   "role": zod.string(),
   "hasPin": zod.boolean(),
+  "totpEnabled": zod.boolean(),
   "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -89,6 +91,7 @@ export const SubmitKycResponse = zod.object({
   "dateOfBirth": zod.string().nullish(),
   "role": zod.string(),
   "hasPin": zod.boolean(),
+  "totpEnabled": zod.boolean(),
   "phoneVerified": zod.boolean(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -106,6 +109,13 @@ export const ListAccountsResponseItem = zod.object({
   "currency": zod.string(),
   "balance": zod.number(),
   "status": zod.enum(['active', 'inactive', 'frozen', 'closed']),
+  "accessRole": zod.enum(['owner', 'manager', 'viewer']),
+  "permissions": zod.object({
+  "canView": zod.boolean(),
+  "canTransact": zod.boolean(),
+  "canManage": zod.boolean()
+}),
+  "memberCount": zod.number(),
   "nickname": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -152,9 +162,84 @@ export const GetAccountResponse = zod.object({
   "currency": zod.string(),
   "balance": zod.number(),
   "status": zod.enum(['active', 'inactive', 'frozen', 'closed']),
+  "accessRole": zod.enum(['owner', 'manager', 'viewer']),
+  "permissions": zod.object({
+  "canView": zod.boolean(),
+  "canTransact": zod.boolean(),
+  "canManage": zod.boolean()
+}),
+  "memberCount": zod.number(),
   "nickname": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary List account collaborators
+ */
+export const ListAccountMembersParams = zod.object({
+  "accountId": zod.coerce.number()
+})
+
+export const ListAccountMembersResponseItem = zod.object({
+  "id": zod.number(),
+  "accountId": zod.number(),
+  "userId": zod.number().nullish(),
+  "email": zod.string(),
+  "fullName": zod.string(),
+  "role": zod.enum(['owner', 'manager', 'viewer']),
+  "status": zod.enum(['pending', 'active', 'revoked']),
+  "joinedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListAccountMembersResponse = zod.array(ListAccountMembersResponseItem)
+
+
+/**
+ * @summary Invite a collaborator to an account
+ */
+export const InviteAccountMemberParams = zod.object({
+  "accountId": zod.coerce.number()
+})
+
+export const InviteAccountMemberBody = zod.object({
+  "email": zod.string().email(),
+  "role": zod.enum(['manager', 'viewer'])
+})
+
+
+/**
+ * @summary Update a collaborator role
+ */
+export const UpdateAccountMemberParams = zod.object({
+  "accountId": zod.coerce.number(),
+  "memberId": zod.coerce.number()
+})
+
+export const UpdateAccountMemberBody = zod.object({
+  "role": zod.enum(['manager', 'viewer'])
+})
+
+export const UpdateAccountMemberResponse = zod.object({
+  "id": zod.number(),
+  "accountId": zod.number(),
+  "userId": zod.number().nullish(),
+  "email": zod.string(),
+  "fullName": zod.string(),
+  "role": zod.enum(['owner', 'manager', 'viewer']),
+  "status": zod.enum(['pending', 'active', 'revoked']),
+  "joinedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Remove a collaborator
+ */
+export const RemoveAccountMemberParams = zod.object({
+  "accountId": zod.coerce.number(),
+  "memberId": zod.coerce.number()
 })
 
 

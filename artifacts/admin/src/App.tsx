@@ -15,6 +15,7 @@ import { AuditLogs } from "@/pages/audit-logs";
 import { Reports } from "@/pages/reports";
 import { Email } from "@/pages/email";
 import { Sidebar } from "@/components/sidebar";
+import { Runtime } from "@/pages/runtime";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -169,6 +170,9 @@ function ClerkProviderWithRoutes() {
           <Route path="/reports">
             <AppLayout><ErrorBoundary><Reports /></ErrorBoundary></AppLayout>
           </Route>
+           <Route path="/runtime">
+             <AppLayout><ErrorBoundary><Runtime /></ErrorBoundary></AppLayout>
+           </Route>
           <Route><Redirect to="/" /></Route>
         </Switch>
       </QueryClientProvider>

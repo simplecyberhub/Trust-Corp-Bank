@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db, accountsTable, cardsTable, usersTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { CreateCardBody, GetCardParams, UpdateCardParams, UpdateCardBody, RevealCardBody } from "@workspace/api-zod";
-import { getUserId } from "./accounts";
+import { getUserId, getAccountAccess, getAccessibleAccountIds } from "./accounts";
 import { randomInt, scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { notifyAsync } from "../services/notifications";
@@ -40,7 +40,10 @@ router.get("/cards", async (req, res): Promise<void> => {
   try {
     const uid = await getUserId(clerkId);
     if (!uid) { res.json([]); return; }
-    const rows = await db.select().from(cardsTable).where(eq(cardsTable.userId, uid));
+    const accountIds = await getAccessibleAccountIds(uid);
+    const rows = accountIds.length
+      ? await db.select().from(cardsTable).where(inArray(cardsTable.accountId, accountIds))
+      : [];
     res.json(rows.map(formatCard));
   } catch (err) {
     req.log.error({ err }, "listCards error");
@@ -57,9 +60,10 @@ router.post("/cards", async (req, res): Promise<void> => {
     const uid = await getUserId(clerkId);
     if (!uid) { res.status(404).json({ error: "User not found" }); return; }
 
-    const [account] = await db.select().from(accountsTable)
-      .where(and(eq(accountsTable.id, parse.data.accountId), eq(accountsTable.userId, uid)));
-    if (!account) { res.status(404).json({ error: "Account not found" }); return; }
+    const access = await getAccountAccess(uid, parse.data.accountId);
+    if (!access) { res.status(404).json({ error: "Account not found" }); return; }
+    if (!access.canTransact) { res.status(403).json({ error: "This account is view-only for your role." }); return; }
+    const account = access.account;
 
     const [userRow] = await db.select({ fullName: usersTable.fullName, email: usersTable.email, phone: usersTable.phone })
       .from(usersTable).where(eq(usersTable.id, uid)).limit(1);
@@ -119,8 +123,9 @@ router.get("/cards/:cardId", async (req, res): Promise<void> => {
     const uid = await getUserId(clerkId);
     if (!uid) { res.status(404).json({ error: "Not found" }); return; }
     const [card] = await db.select().from(cardsTable)
-      .where(and(eq(cardsTable.id, parse.data.cardId), eq(cardsTable.userId, uid)));
+      .where(eq(cardsTable.id, parse.data.cardId));
     if (!card) { res.status(404).json({ error: "Not found" }); return; }
+    if (!(await getAccountAccess(uid, card.accountId))) { res.status(404).json({ error: "Not found" }); return; }
     res.json(formatCard(card));
   } catch (err) {
     req.log.error({ err }, "getCard error");
@@ -140,8 +145,11 @@ router.patch("/cards/:cardId", async (req, res): Promise<void> => {
     if (!uid) { res.status(404).json({ error: "Not found" }); return; }
 
     const [existing] = await db.select().from(cardsTable)
-      .where(and(eq(cardsTable.id, paramParse.data.cardId), eq(cardsTable.userId, uid)));
+      .where(eq(cardsTable.id, paramParse.data.cardId));
     if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    const access = await getAccountAccess(uid, existing.accountId);
+    if (!access) { res.status(404).json({ error: "Not found" }); return; }
+    if (!access.canTransact) { res.status(403).json({ error: "This account is view-only for your role." }); return; }
     if (existing.status === "cancelled") { res.status(400).json({ error: "This card has been cancelled and can no longer be modified." }); return; }
 
     const update: Record<string, unknown> = {};
@@ -157,7 +165,7 @@ router.patch("/cards/:cardId", async (req, res): Promise<void> => {
 
     const [card] = await db.update(cardsTable)
       .set(update)
-      .where(and(eq(cardsTable.id, paramParse.data.cardId), eq(cardsTable.userId, uid)))
+      .where(eq(cardsTable.id, paramParse.data.cardId))
       .returning();
     if (!card) { res.status(404).json({ error: "Not found" }); return; }
     res.json(formatCard(card));
@@ -198,8 +206,11 @@ router.post("/cards/:cardId/reveal", async (req, res): Promise<void> => {
     if (!user) { res.status(404).json({ error: "Not found" }); return; }
 
     const [card] = await db.select().from(cardsTable)
-      .where(and(eq(cardsTable.id, cardId), eq(cardsTable.userId, user.id)));
+      .where(eq(cardsTable.id, cardId));
     if (!card) { res.status(404).json({ error: "Not found" }); return; }
+    const access = await getAccountAccess(user.id, card.accountId);
+    if (!access) { res.status(404).json({ error: "Not found" }); return; }
+    if (!access.canTransact) { res.status(403).json({ error: "This account is view-only for your role." }); return; }
     if (card.status === "cancelled") { res.status(400).json({ error: "This card has been cancelled." }); return; }
 
     if (!user.transactionPin) { res.status(403).json({ error: "Set a transaction PIN in your profile before revealing card details." }); return; }
@@ -242,8 +253,11 @@ router.post("/cards/:cardId/report-lost", async (req, res): Promise<void> => {
     if (!uid) { res.status(404).json({ error: "Not found" }); return; }
 
     const [existing] = await db.select().from(cardsTable)
-      .where(and(eq(cardsTable.id, cardId), eq(cardsTable.userId, uid)));
+      .where(eq(cardsTable.id, cardId));
     if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    const access = await getAccountAccess(uid, existing.accountId);
+    if (!access) { res.status(404).json({ error: "Not found" }); return; }
+    if (!access.canTransact) { res.status(403).json({ error: "This account is view-only for your role." }); return; }
     if (existing.status === "cancelled") { res.status(400).json({ error: "This card is already cancelled." }); return; }
 
     const [cancelledCard] = await db.update(cardsTable)

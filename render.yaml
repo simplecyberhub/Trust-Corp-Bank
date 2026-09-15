@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: trustcorp-bank
+    runtime: node
+    buildCommand: pnpm install --frozen-lockfile && pnpm run build
+    startCommand: pnpm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BASE_PATH
+        value: /
+      - key: ALLOWED_ORIGIN
+        value: https://trustcorp.onrender.com
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_DATABASE_URL
+        sync: false
+      - key: ADMIN_SETUP_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: TERMII_API_KEY
+        sync: false

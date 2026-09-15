@@ -5,6 +5,7 @@ import { eq, desc, sql, and } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { notifyAsync } from "../services/notifications";
 import { getEmailConfig, saveEmailConfig, sendTestEmail } from "../services/email";
+import { getSafeRuntimeStatus } from "../config";
 
 /** Fire-and-forget audit log entry. */
 function logAudit(
@@ -109,6 +110,10 @@ router.get("/admin/stats", requireAdmin, async (req, res): Promise<void> => {
     req.log.error({ err }, "adminStats error");
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+router.get("/admin/runtime-config", requireAdmin, (_req, res): void => {
+  res.json(getSafeRuntimeStatus());
 });
 
 router.get("/admin/users", requireAdmin, async (req, res): Promise<void> => {
