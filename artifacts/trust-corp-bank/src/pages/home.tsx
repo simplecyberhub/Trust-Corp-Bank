@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowUpRight, ArrowDownLeft, Plus, MoreHorizontal,
-  ArrowRightLeft, RefreshCw, Send, Eye, EyeOff, Building2,
+  ArrowRightLeft, RefreshCw, Send, Eye, EyeOff, Building2, UsersRound,
 } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -258,7 +258,8 @@ export function Home() {
         {[
           { icon: Send, label: "Transfer", href: "/transfer" },
           { icon: RefreshCw, label: "Exchange", href: "/exchange" },
-          { icon: MoreHorizontal, label: "More", href: "/profile" },
+           { icon: UsersRound, label: "Shared", href: "/shared-accounts" },
+           { icon: MoreHorizontal, label: "More", href: "/profile" },
         ].map((action, i) => (
           <Link key={i} href={action.href} className="flex flex-col items-center gap-2 group">
             <div className="w-14 h-14 bg-card rounded-full flex items-center justify-center border border-border group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors shadow-sm">

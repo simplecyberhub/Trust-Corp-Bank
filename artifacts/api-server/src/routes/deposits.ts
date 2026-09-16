@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db, accountsTable, depositRequestsTable, usersTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { CreateDepositRequestBody } from "@workspace/api-zod";
-import { getUserId } from "./accounts";
+import { getUserId, getAccountAccess, getAccessibleAccountIds } from "./accounts";
 import { notifyAsync } from "../services/notifications";
 import { emailAsync } from "../services/email";
 import { sendSms } from "../services/sms";
@@ -23,8 +23,9 @@ router.get("/deposits", async (req, res): Promise<void> => {
   try {
     const uid = await getUserId(clerkId);
     if (!uid) { res.json([]); return; }
+    const accountIds = await getAccessibleAccountIds(uid, "canView");
     const rows = await db.select().from(depositRequestsTable)
-      .where(eq(depositRequestsTable.userId, uid))
+      .where(accountIds.length ? inArray(depositRequestsTable.accountId, accountIds) : eq(depositRequestsTable.id, -1))
       .orderBy(desc(depositRequestsTable.createdAt));
     res.json(rows.map(formatDeposit));
   } catch (err) {
@@ -55,9 +56,10 @@ router.post("/deposits", async (req, res): Promise<void> => {
     const { accountId, amount, currency, method, reference, note } = parse.data;
     if (amount <= 0) { res.status(400).json({ error: "Amount must be greater than zero." }); return; }
 
-    const [account] = await db.select().from(accountsTable)
-      .where(and(eq(accountsTable.id, accountId), eq(accountsTable.userId, uid)));
-    if (!account) { res.status(404).json({ error: "Account not found" }); return; }
+    const access = await getAccountAccess(uid, accountId);
+    if (!access) { res.status(404).json({ error: "Account not found" }); return; }
+    if (!access.canTransact) { res.status(403).json({ error: "This account is view-only for your role." }); return; }
+    const account = access.account;
     if (account.status !== "active") { res.status(400).json({ error: "This account is not active." }); return; }
 
     const [deposit] = await db.insert(depositRequestsTable).values({

@@ -7,7 +7,7 @@ import {
   GetTransactionParams,
   SendMoneyBody,
 } from "@workspace/api-zod";
-import { getUserId } from "./accounts";
+import { getUserId, getAccessibleAccountIds, getAccountAccess } from "./accounts";
 import { randomBytes } from "crypto";
 import { sendSms, formatSmsAlert } from "../services/sms";
 import { notifyAsync } from "../services/notifications";
@@ -37,9 +37,7 @@ router.get("/transactions", async (req, res): Promise<void> => {
     const uid = await getUserId(clerkId);
     if (!uid) { res.json({ items: [], total: 0, limit: 20, offset: 0 }); return; }
 
-    const accounts = await db.select({ id: accountsTable.id })
-      .from(accountsTable).where(eq(accountsTable.userId, uid));
-    const accountIds = accounts.map(a => a.id);
+    const accountIds = await getAccessibleAccountIds(uid);
     if (accountIds.length === 0) { res.json({ items: [], total: 0, limit: 20, offset: 0 }); return; }
 
     const { limit = 20, offset = 0, accountId, type } = parse.data;
@@ -79,8 +77,7 @@ router.get("/transactions/activity", async (req, res): Promise<void> => {
   try {
     const uid = await getUserId(clerkId);
     if (!uid) { res.json([]); return; }
-    const accounts = await db.select({ id: accountsTable.id }).from(accountsTable).where(eq(accountsTable.userId, uid));
-    const ids = accounts.map(a => a.id);
+    const ids = await getAccessibleAccountIds(uid);
     if (ids.length === 0) { res.json([]); return; }
     const txs = await db.select().from(transactionsTable)
       .where(inArray(transactionsTable.accountId, ids))
@@ -102,9 +99,7 @@ router.get("/transactions/:txId", async (req, res): Promise<void> => {
     const uid = await getUserId(clerkId);
     if (!uid) { res.status(404).json({ error: "Not found" }); return; }
 
-    const userAccounts = await db.select({ id: accountsTable.id })
-      .from(accountsTable).where(eq(accountsTable.userId, uid));
-    const accountIds = userAccounts.map(a => a.id);
+    const accountIds = await getAccessibleAccountIds(uid);
     if (accountIds.length === 0) { res.status(404).json({ error: "Not found" }); return; }
 
     const rows = await db.select().from(transactionsTable)
@@ -144,6 +139,11 @@ router.post("/transactions/send", async (req, res): Promise<void> => {
     }
 
     const { fromAccountId, amount, currency, description, recipientAccount, recipientName } = parse.data;
+    const access = await getAccountAccess(uid, fromAccountId);
+    if (!access) { res.status(404).json({ error: "Account not found" }); return; }
+    if (!access.canTransact) {
+      res.status(403).json({ error: "This account is view-only for your role." }); return;
+    }
     // Extra bank-detail fields — validate and sanitize from raw body
     const rawTransferType = typeof req.body.transferType === "string" ? req.body.transferType : "domestic";
     const transferType: "domestic" | "international" =
@@ -180,7 +180,7 @@ router.post("/transactions/send", async (req, res): Promise<void> => {
 
     const tx = await db.transaction(async (trx) => {
       const [account] = await trx.select().from(accountsTable)
-        .where(and(eq(accountsTable.id, fromAccountId), eq(accountsTable.userId, uid)));
+        .where(eq(accountsTable.id, fromAccountId));
       if (!account) throw Object.assign(new Error("Account not found"), { status: 404 });
       if (account.status === "frozen") throw Object.assign(new Error("This account is frozen"), { status: 403 });
       if (account.balance < amount) throw Object.assign(new Error("Insufficient funds"), { status: 400 });

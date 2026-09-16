@@ -56,3 +56,12 @@ description: Key decisions, conventions, and non-obvious constraints for this mo
 
 ## esbuild note
 - `zod`/`zod/v4` cannot be resolved directly in api-server bundle; use `@workspace/api-zod` Zod types only
+
+## Shared account access
+- Shared access is enforced server-side through `account_members`; owners have full control, managers can transact, and viewers are read-only.
+- Invitations remain pending until the invited user authenticates with the matching email; never grant access merely because an email already exists.
+- Any endpoint that reads or mutates an account must use the account access helper rather than checking `accounts.userId` directly.
+
+## Production configuration
+- Production startup validates Clerk and database configuration, while the admin runtime page reports only safe configured/not-configured booleans.
+- Public production values belong in environment configuration; server keys stay in the secret store and are never returned by diagnostics.

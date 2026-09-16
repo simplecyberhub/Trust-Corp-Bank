@@ -21,6 +21,9 @@ import type {
 
 import type {
   AccountInput,
+  AccountMember,
+  AccountMemberInput,
+  AccountMemberRoleInput,
   AccountSummary,
   BankAccount,
   Beneficiary,
@@ -665,6 +668,301 @@ export function useGetAccount<TData = Awaited<ReturnType<typeof getAccount>>, TE
 
 
 
+
+export const getListAccountMembersUrl = (accountId: number,) => {
+
+
+
+
+  return `/api/accounts/${accountId}/members`
+}
+
+/**
+ * @summary List account collaborators
+ */
+export const listAccountMembers = async (accountId: number, options?: RequestInit): Promise<AccountMember[]> => {
+
+  return customFetch<AccountMember[]>(getListAccountMembersUrl(accountId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAccountMembersQueryKey = (accountId: number,) => {
+    return [
+    `/api/accounts/${accountId}/members`
+    ] as const;
+    }
+
+
+export const getListAccountMembersQueryOptions = <TData = Awaited<ReturnType<typeof listAccountMembers>>, TError = ErrorType<unknown>>(accountId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccountMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAccountMembersQueryKey(accountId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAccountMembers>>> = ({ signal }) => listAccountMembers(accountId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(accountId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAccountMembers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAccountMembersQueryResult = NonNullable<Awaited<ReturnType<typeof listAccountMembers>>>
+export type ListAccountMembersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List account collaborators
+ */
+
+export function useListAccountMembers<TData = Awaited<ReturnType<typeof listAccountMembers>>, TError = ErrorType<unknown>>(
+ accountId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccountMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAccountMembersQueryOptions(accountId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getInviteAccountMemberUrl = (accountId: number,) => {
+
+
+
+
+  return `/api/accounts/${accountId}/members`
+}
+
+/**
+ * @summary Invite a collaborator to an account
+ */
+export const inviteAccountMember = async (accountId: number,
+    accountMemberInput: AccountMemberInput, options?: RequestInit): Promise<AccountMember> => {
+
+  return customFetch<AccountMember>(getInviteAccountMemberUrl(accountId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      accountMemberInput,)
+  }
+);}
+
+
+
+
+export const getInviteAccountMemberMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteAccountMember>>, TError,{accountId: number;data: BodyType<AccountMemberInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inviteAccountMember>>, TError,{accountId: number;data: BodyType<AccountMemberInput>}, TContext> => {
+
+const mutationKey = ['inviteAccountMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inviteAccountMember>>, {accountId: number;data: BodyType<AccountMemberInput>}> = (props) => {
+          const {accountId,data} = props ?? {};
+
+          return  inviteAccountMember(accountId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InviteAccountMemberMutationResult = NonNullable<Awaited<ReturnType<typeof inviteAccountMember>>>
+    export type InviteAccountMemberMutationBody = BodyType<AccountMemberInput>
+    export type InviteAccountMemberMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Invite a collaborator to an account
+ */
+export const useInviteAccountMember = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteAccountMember>>, TError,{accountId: number;data: BodyType<AccountMemberInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inviteAccountMember>>,
+        TError,
+        {accountId: number;data: BodyType<AccountMemberInput>},
+        TContext
+      > => {
+      return useMutation(getInviteAccountMemberMutationOptions(options));
+    }
+
+export const getUpdateAccountMemberUrl = (accountId: number,
+    memberId: number,) => {
+
+
+
+
+  return `/api/accounts/${accountId}/members/${memberId}`
+}
+
+/**
+ * @summary Update a collaborator role
+ */
+export const updateAccountMember = async (accountId: number,
+    memberId: number,
+    accountMemberRoleInput: AccountMemberRoleInput, options?: RequestInit): Promise<AccountMember> => {
+
+  return customFetch<AccountMember>(getUpdateAccountMemberUrl(accountId,memberId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      accountMemberRoleInput,)
+  }
+);}
+
+
+
+
+export const getUpdateAccountMemberMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountMember>>, TError,{accountId: number;memberId: number;data: BodyType<AccountMemberRoleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAccountMember>>, TError,{accountId: number;memberId: number;data: BodyType<AccountMemberRoleInput>}, TContext> => {
+
+const mutationKey = ['updateAccountMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAccountMember>>, {accountId: number;memberId: number;data: BodyType<AccountMemberRoleInput>}> = (props) => {
+          const {accountId,memberId,data} = props ?? {};
+
+          return  updateAccountMember(accountId,memberId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAccountMemberMutationResult = NonNullable<Awaited<ReturnType<typeof updateAccountMember>>>
+    export type UpdateAccountMemberMutationBody = BodyType<AccountMemberRoleInput>
+    export type UpdateAccountMemberMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a collaborator role
+ */
+export const useUpdateAccountMember = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountMember>>, TError,{accountId: number;memberId: number;data: BodyType<AccountMemberRoleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAccountMember>>,
+        TError,
+        {accountId: number;memberId: number;data: BodyType<AccountMemberRoleInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAccountMemberMutationOptions(options));
+    }
+
+export const getRemoveAccountMemberUrl = (accountId: number,
+    memberId: number,) => {
+
+
+
+
+  return `/api/accounts/${accountId}/members/${memberId}`
+}
+
+/**
+ * @summary Remove a collaborator
+ */
+export const removeAccountMember = async (accountId: number,
+    memberId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getRemoveAccountMemberUrl(accountId,memberId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getRemoveAccountMemberMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeAccountMember>>, TError,{accountId: number;memberId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeAccountMember>>, TError,{accountId: number;memberId: number}, TContext> => {
+
+const mutationKey = ['removeAccountMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeAccountMember>>, {accountId: number;memberId: number}> = (props) => {
+          const {accountId,memberId} = props ?? {};
+
+          return  removeAccountMember(accountId,memberId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveAccountMemberMutationResult = NonNullable<Awaited<ReturnType<typeof removeAccountMember>>>
+
+    export type RemoveAccountMemberMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove a collaborator
+ */
+export const useRemoveAccountMember = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeAccountMember>>, TError,{accountId: number;memberId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeAccountMember>>,
+        TError,
+        {accountId: number;memberId: number},
+        TContext
+      > => {
+      return useMutation(getRemoveAccountMemberMutationOptions(options));
+    }
 
 export const getListTransactionsUrl = (params?: ListTransactionsParams,) => {
   const normalizedParams = new URLSearchParams();

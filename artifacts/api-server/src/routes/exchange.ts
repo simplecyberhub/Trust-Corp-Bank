@@ -3,7 +3,7 @@ import { getAuth } from "@clerk/express";
 import { db, accountsTable, transactionsTable, usersTable } from "@workspace/db";
 import { eq, and, or } from "drizzle-orm";
 import { GetExchangeRatesQueryParams, ConvertCurrencyBody } from "@workspace/api-zod";
-import { getUserId } from "./accounts";
+import { getUserId, getAccountAccess } from "./accounts";
 import { randomBytes } from "crypto";
 import { notifyAsync } from "../services/notifications";
 import { emailAsync } from "../services/email";
@@ -116,14 +116,20 @@ router.post("/exchange/convert", async (req, res): Promise<void> => {
       userPhone = userRow.phone ?? null;
 
       const result = await db.transaction(async (trx) => {
-        const [fromAcc] = await trx.select().from(accountsTable)
-          .where(and(eq(accountsTable.id, fromAccountId), eq(accountsTable.userId, uid)));
+      const fromAccess = await getAccountAccess(uid, fromAccountId);
+      const toAccess = await getAccountAccess(uid, toAccountId);
+      if (!fromAccess || !toAccess) throw Object.assign(new Error("Account not found"), { status: 404 });
+      if (!fromAccess.canTransact || !toAccess.canTransact) {
+        throw Object.assign(new Error("This account is view-only for your role."), { status: 403 });
+      }
+      const [fromAcc] = await trx.select().from(accountsTable)
+        .where(eq(accountsTable.id, fromAccountId));
         if (!fromAcc) throw Object.assign(new Error("Source account not found"), { status: 404 });
         if (fromAcc.status === "frozen") throw Object.assign(new Error("Source account is frozen."), { status: 403 });
         if (fromAcc.balance < amount) throw Object.assign(new Error("Insufficient funds"), { status: 400 });
 
-        const [toAcc] = await trx.select().from(accountsTable)
-          .where(and(eq(accountsTable.id, toAccountId), eq(accountsTable.userId, uid)));
+      const [toAcc] = await trx.select().from(accountsTable)
+        .where(eq(accountsTable.id, toAccountId));
         if (!toAcc) throw Object.assign(new Error("Destination account not found"), { status: 404 });
 
         const ref = "TCB" + randomBytes(6).toString("hex").toUpperCase();

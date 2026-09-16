@@ -12,12 +12,17 @@ import {
 
 import router from "./routes";
 import { logger } from "./lib/logger";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { appConfig } from "./config";
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { appConfig } from "./config";
 
 const app: Express = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,6 +56,8 @@ app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 // Allows Replit-hosted frontends (*.replit.app, *.replit.dev), Render (*.onrender.com),
 // and any custom domain set via ALLOWED_ORIGIN env var, plus localhost for development.
 const EXTRA_ORIGINS = appConfig.allowedOrigins;
+const TRUSTED_ORIGIN_RE =
+  /^https?:\/\/(localhost(:\d+)?|[^/]+\.replit\.(app|dev)|[^/]+\.onrender\.com)(\/.*)?$/;
 // =======
 // CORS configuration
 // const EXTRA_ORIGIN = process.env.ALLOWED_ORIGIN;
@@ -107,6 +114,17 @@ app.use(
 
 app.use("/api", router);
 
+// Serve the trust-corp-bank SPA.
+// The Vite build outputs directly into this directory:
+//   artifacts/trust-corp-bank/vite.config.ts → outDir: ../api-server/dist/public
+// so at runtime __dirname/public is the built frontend.
+const publicDir = path.join(__dirname, "public");
+
+app.use(express.static(publicDir));
+
+// SPA fallback — any unmatched GET returns index.html so client-side routing works.
+app.get("/*path", (_, res) => {
+  res.sendFile(path.join(publicDir, "index.html"));
 // ============================================================
 // MAIN BANKING APPLICATION
 // ============================================================

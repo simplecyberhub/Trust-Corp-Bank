@@ -85,6 +85,21 @@ export const BankAccountStatus = {
   closed: 'closed',
 } as const;
 
+export type BankAccountAccessRole = typeof BankAccountAccessRole[keyof typeof BankAccountAccessRole];
+
+
+export const BankAccountAccessRole = {
+  owner: 'owner',
+  manager: 'manager',
+  viewer: 'viewer',
+} as const;
+
+export type BankAccountPermissions = {
+  canView: boolean;
+  canTransact: boolean;
+  canManage: boolean;
+};
+
 export interface BankAccount {
   id: number;
   userId: number;
@@ -93,10 +108,70 @@ export interface BankAccount {
   currency: string;
   balance: number;
   status: BankAccountStatus;
+  accessRole: BankAccountAccessRole;
+  permissions: BankAccountPermissions;
+  memberCount: number;
   /** @nullable */
   nickname?: string | null;
   createdAt: string;
   updatedAt?: string;
+}
+
+export type AccountMemberRole = typeof AccountMemberRole[keyof typeof AccountMemberRole];
+
+
+export const AccountMemberRole = {
+  owner: 'owner',
+  manager: 'manager',
+  viewer: 'viewer',
+} as const;
+
+export type AccountMemberStatus = typeof AccountMemberStatus[keyof typeof AccountMemberStatus];
+
+
+export const AccountMemberStatus = {
+  pending: 'pending',
+  active: 'active',
+  revoked: 'revoked',
+} as const;
+
+export interface AccountMember {
+  id: number;
+  accountId: number;
+  /** @nullable */
+  userId?: number | null;
+  email: string;
+  fullName: string;
+  role: AccountMemberRole;
+  status: AccountMemberStatus;
+  /** @nullable */
+  joinedAt?: string | null;
+  createdAt: string;
+}
+
+export type AccountMemberInputRole = typeof AccountMemberInputRole[keyof typeof AccountMemberInputRole];
+
+
+export const AccountMemberInputRole = {
+  manager: 'manager',
+  viewer: 'viewer',
+} as const;
+
+export interface AccountMemberInput {
+  email: string;
+  role: AccountMemberInputRole;
+}
+
+export type AccountMemberRoleInputRole = typeof AccountMemberRoleInputRole[keyof typeof AccountMemberRoleInputRole];
+
+
+export const AccountMemberRoleInputRole = {
+  manager: 'manager',
+  viewer: 'viewer',
+} as const;
+
+export interface AccountMemberRoleInput {
+  role: AccountMemberRoleInputRole;
 }
 
 export type AccountInputAccountType = typeof AccountInputAccountType[keyof typeof AccountInputAccountType];

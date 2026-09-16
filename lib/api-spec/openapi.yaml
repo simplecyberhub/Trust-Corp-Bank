@@ -147,6 +147,98 @@ paths:
         "404":
           description: Not found
 
+  /accounts/{accountId}/members:
+    get:
+      operationId: listAccountMembers
+      tags: [accounts]
+      summary: List account collaborators
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Account collaborators
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccountMember"
+    post:
+      operationId: inviteAccountMember
+      tags: [accounts]
+      summary: Invite a collaborator to an account
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountMemberInput"
+      responses:
+        "201":
+          description: Collaborator invited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountMember"
+
+  /accounts/{accountId}/members/{memberId}:
+    patch:
+      operationId: updateAccountMember
+      tags: [accounts]
+      summary: Update a collaborator role
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountMemberRoleInput"
+      responses:
+        "200":
+          description: Updated collaborator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountMember"
+    delete:
+      operationId: removeAccountMember
+      tags: [accounts]
+      summary: Remove a collaborator
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Collaborator removed
+
   /transactions:
     get:
       operationId: listTransactions
@@ -604,7 +696,7 @@ components:
 
     UserProfile:
       type: object
-      required: [id, clerkId, email, fullName, kycStatus, role, hasPin, phoneVerified, createdAt]
+      required: [id, clerkId, email, fullName, kycStatus, role, hasPin, totpEnabled, phoneVerified, createdAt]
       properties:
         id:
           type: integer
@@ -628,6 +720,8 @@ components:
         role:
           type: string
         hasPin:
+          type: boolean
+        totpEnabled:
           type: boolean
         phoneVerified:
           type: boolean
@@ -668,7 +762,7 @@ components:
 
     BankAccount:
       type: object
-      required: [id, userId, accountNumber, accountType, currency, balance, status, createdAt]
+      required: [id, userId, accountNumber, accountType, currency, balance, status, accessRole, permissions, memberCount, createdAt]
       properties:
         id:
           type: integer
@@ -686,12 +780,71 @@ components:
         status:
           type: string
           enum: [active, inactive, frozen, closed]
+        accessRole:
+          type: string
+          enum: [owner, manager, viewer]
+        permissions:
+          type: object
+          required: [canView, canTransact, canManage]
+          properties:
+            canView:
+              type: boolean
+            canTransact:
+              type: boolean
+            canManage:
+              type: boolean
+        memberCount:
+          type: integer
         nickname:
           type: ["string", "null"]
         createdAt:
           type: string
         updatedAt:
           type: string
+
+    AccountMember:
+      type: object
+      required: [id, accountId, email, fullName, role, status, createdAt]
+      properties:
+        id:
+          type: integer
+        accountId:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        email:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [owner, manager, viewer]
+        status:
+          type: string
+          enum: [pending, active, revoked]
+        joinedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    AccountMemberInput:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [manager, viewer]
+
+    AccountMemberRoleInput:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [manager, viewer]
 
     AccountInput:
       type: object
