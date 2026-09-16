@@ -46,16 +46,16 @@ app.use(
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-<<<<<<< HEAD
+// <<<<<<< HEAD
 // Restrict CORS to known trusted origins rather than reflecting any origin.
 // Allows Replit-hosted frontends (*.replit.app, *.replit.dev), Render (*.onrender.com),
 // and any custom domain set via ALLOWED_ORIGIN env var, plus localhost for development.
 const EXTRA_ORIGINS = appConfig.allowedOrigins;
-=======
+// =======
 // CORS configuration
 // const EXTRA_ORIGIN = process.env.ALLOWED_ORIGIN;
 
->>>>>>> 9cf24457f5caead8107709fa696e9bd7b79c0d20
+// >>>>>>> 9cf24457f5caead8107709fa696e9bd7b79c0d20
 const TRUSTED_ORIGIN_RE =
   /^https?:\/\/(localhost(:\d+)?|[^/]+\.replit\.(app|dev)|[^/]+\.onrender\.com)(\/.*)?$/;
 
@@ -64,12 +64,12 @@ app.use(
     credentials: true,
 
     origin: (origin, callback) => {
-<<<<<<< HEAD
+// <<<<<<< HEAD
       // Same-origin or server-to-server requests have no Origin header — allow them.
       if (!origin) return callback(null, true);
       if (TRUSTED_ORIGIN_RE.test(origin)) return callback(null, true);
       if (EXTRA_ORIGINS.includes(origin)) return callback(null, true);
-=======
+// =======
       // Same-origin or server-to-server requests
   //    if (!origin) {
 //        return callback(null, true);
@@ -83,7 +83,7 @@ app.use(
   //    return callback(null, true);
   //    }
 
->>>>>>> 9cf24457f5caead8107709fa696e9bd7b79c0d20
+// >>>>>>> 9cf24457f5caead8107709fa696e9bd7b79c0d20
       callback(new Error(`CORS: origin '${origin}' not allowed`));
     },
   }),
