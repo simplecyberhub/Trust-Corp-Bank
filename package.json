@@ -7,7 +7,7 @@
     "check:conflicts": "node scripts/check-conflict-markers.mjs",
     "typecheck:libs": "tsc --build --force",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "build": "pnpm run check:conflicts && pnpm run typecheck && pnpm --filter @workspace/api-server build && pnpm --filter @workspace/trust-corp-bank build",
+    "build": "pnpm run check:conflicts && pnpm run typecheck && pnpm --filter @workspace/api-server build && pnpm --filter @workspace/admin build && pnpm --filter @workspace/trust-corp-bank build",
     "build:libs": "pnpm run typecheck:libs && pnpm --filter @workspace/trust-corp-bank build",
     "build:api-server": "pnpm --filter @workspace/api-server build",
     "dev": "pnpm --filter @workspace/api-server run dev",
