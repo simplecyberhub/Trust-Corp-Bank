@@ -17,6 +17,8 @@ services:
         sync: false
       - key: VITE_CLERK_PUBLISHABLE_KEY
         sync: false
+      - key: VITE_CLERK_PROXY_URL
+        value: /api/__clerk
       - key: SUPABASE_DATABASE_URL
         sync: false
       - key: ADMIN_SETUP_SECRET
